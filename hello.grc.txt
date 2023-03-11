@@ -1,0 +1,8 @@
+fun hello () : nothing $ com m ment
+{
+$$ hhhhhhhhhhhhhhhhhhhhhhhhhhhh
+jjjjjjjjj
+jjjjjjjjjj
+$$
+   writeString("Hel\"\"lo" + " world!\n");
+}
