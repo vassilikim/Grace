@@ -91,7 +91,7 @@ $\$([^\$]|(\n)|($[^\$]))*$\$    {   for(int i =0; i<strlen(yytext);i++){
 %%
 void illegal_char(char character) {
     if (character == '$')
-        printf("expected \"$$\" at the end of the commnet");
+        printf("expected \"$$\" at the end of the comment -- line: %d", line);
     else printf("illegal character: %c -- line: %d", character, line);
     exit(1);
 }
