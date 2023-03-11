@@ -74,10 +74,10 @@ W [ \t\r]
 "<-" {return T_assign;}
 
 \n    {line++;}
-{W}+  { /*nothing*/}
+{W}+  {/*nothing*/}
 
 \$                              {/*nothong*/}
-$[^$].*                         {/**nothing*/}
+$[^$].*                         {/*nothing*/}
 $\$([^\$]|(\n)|($[^\$]))*$\$    {   for(int i =0; i<strlen(yytext);i++){
                                         if(yytext[i] == '\n') line++;   
                                     }
