@@ -76,13 +76,13 @@ W [ \t\r]
 [\(\)\[\]\{\}\,\;\:] {check_last(); return yytext[0];}
 "<-" {check_last(); return T_assign;}
 
-\n    {line++; check_last();}
+\n    {check_last(); line++;}
 {W}+  {/*nothing*/}
 
-\$\n {line++; check_last();}
-\$[^\$\n]\n                      {line++; check_last();}
+\$\n {check_last(); line++;}
+\$[^\$\n].*\n                      {check_last(); line++;}
 \$ {check_last(); last = 1;}
-\$[^\$\n] {check_last(); last = 1;}
+\$[^\$\n].* {check_last(); last = 1;}
 \$\$([^\$]|(\n)|(\$[^\$]))*\$\$    {   check_last();
                                         for(int i =0; i<strlen(yytext);i++){
                                             if(yytext[i] == '\n') line++;   
