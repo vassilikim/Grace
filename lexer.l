@@ -32,7 +32,10 @@
 #define T_assign  3002
 
 int line = 1;
+int last = 0;
+
 void illegal_char(char character);
+void check_last();
 %}
 
 L [a-zA-Z]
@@ -41,50 +44,50 @@ W [ \t\r]
 
 
 %%
-"and"     {return T_and;}
-"char"    {return T_char;}
-"div"     {return T_div;}
-"do"      {return T_do;}
-"else"    {return T_else;}
-"fun"     {return T_fun;}
-"if"      {return T_if;}
-"int"     {return T_int;}
-"mod"     {return T_mod;}
-"not"     {return T_not;}
-"nothing" {return T_nothing;}
-"or"      {return T_or;}
-"ref"     {return T_ref;}
-"return"  {return T_return;}
-"then"    {return T_then;}
-"var"     {return T_var;}
-"while"   {return T_while;}
+"and"     {check_last(); return T_and;}
+"char"    {check_last(); return T_char;}
+"div"     {check_last(); return T_div;}
+"do"      {check_last(); return T_do;}
+"else"    {check_last(); return T_else;}
+"fun"     {check_last(); return T_fun;}
+"if"      {check_last(); return T_if;}
+"int"     {check_last(); return T_int;}
+"mod"     {check_last(); return T_mod;}
+"not"     {check_last(); return T_not;}
+"nothing" {check_last(); return T_nothing;}
+"or"      {check_last(); return T_or;}
+"ref"     {check_last(); return T_ref;}
+"return"  {check_last(); return T_return;}
+"then"    {check_last(); return T_then;}
+"var"     {check_last(); return T_var;}
+"while"   {check_last(); return T_while;}
 
-{L}({L}|{D}|_)* {return T_id;}
-{D}+            {return T_const;}
+{L}({L}|{D}|_)* {check_last(); return T_id;}
+{D}+            {check_last(); return T_const;}
 
-(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {return T_constchar;}
+(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {check_last(); return T_constchar;}
 
-\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {return T_string;}
+\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {check_last(); return T_string;}
 
-[\+\-\*\=\#\>\<] {return yytext[0];}
-">=" {return T_meq;}
-"<=" {return T_leq;}
+[\+\-\*\=\#\>\<] {check_last(); return yytext[0];}
+">=" {check_last(); return T_meq;}
+"<=" {check_last(); return T_leq;}
 
-[\(\)\[\]\{\}\,\;\:] {return yytext[0];}
-"<-" {return T_assign;}
+[\(\)\[\]\{\}\,\;\:] {check_last(); return yytext[0];}
+"<-" {check_last(); return T_assign;}
 
-\n    {line++;}
+\n    {line++; check_last();}
 {W}+  {/*nothing*/}
 
-\$                              {/*nothong*/}
-$[^$].*                         {/*nothing*/}
-$\$([^\$]|(\n)|($[^\$]))*$\$    {   for(int i =0; i<strlen(yytext);i++){
-                                        if(yytext[i] == '\n') line++;   
-                                    }
-                                }
-
-
-
+\$\n {line++; check_last();}
+\$[^\$\n]\n                      {line++; check_last();}
+\$ {check_last(); last = 1;}
+\$[^\$\n] {check_last(); last = 1;}
+\$\$([^\$]|(\n)|(\$[^\$]))*\$\$    {   check_last();
+                                        for(int i =0; i<strlen(yytext);i++){
+                                            if(yytext[i] == '\n') line++;   
+                                        }
+                                }                            
 . {illegal_char( yytext[0] );}
 
 
@@ -94,6 +97,12 @@ void illegal_char(char character) {
         printf("expected \"$$\" at the end of the comment -- line: %d", line);
     else printf("illegal character: %c -- line: %d", character, line);
     exit(1);
+}
+
+void check_last() {
+    if(last == 1) {
+        illegal_char('$');
+    }
 }
 
 int main (int argc, char *argv[]) {
