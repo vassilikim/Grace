@@ -44,50 +44,51 @@ W [ \t\r]
 
 
 %%
-"and"     {check_last(); return T_and;}
-"char"    {check_last(); return T_char;}
-"div"     {check_last(); return T_div;}
-"do"      {check_last(); return T_do;}
-"else"    {check_last(); return T_else;}
-"fun"     {check_last(); return T_fun;}
-"if"      {check_last(); return T_if;}
-"int"     {check_last(); return T_int;}
-"mod"     {check_last(); return T_mod;}
-"not"     {check_last(); return T_not;}
-"nothing" {check_last(); return T_nothing;}
-"or"      {check_last(); return T_or;}
-"ref"     {check_last(); return T_ref;}
-"return"  {check_last(); return T_return;}
-"then"    {check_last(); return T_then;}
-"var"     {check_last(); return T_var;}
-"while"   {check_last(); return T_while;}
+"and"     { return T_and;}
+"char"    {return T_char;}
+"div"     {return T_div;}
+"do"      {return T_do;}
+"else"    {return T_else;}
+"fun"     {return T_fun;}
+"if"      {return T_if;}
+"int"     {return T_int;}
+"mod"     {return T_mod;}
+"not"     {return T_not;}
+"nothing" { return T_nothing;}
+"or"      {return T_or;}
+"ref"     {return T_ref;}
+"return"  {return T_return;}
+"then"    {return T_then;}
+"var"     {return T_var;}
+"while"   {return T_while;}
 
-{L}({L}|{D}|_)* {check_last(); return T_id;}
-{D}+            {check_last(); return T_const;}
+{L}({L}|{D}|_)* {return T_id;}
+{D}+            {return T_const;}
 
-(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {check_last(); return T_constchar;}
+(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {return T_constchar;}
 
-\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {check_last(); return T_string;}
+\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {return T_string;}
 
-[\+\-\*\=\#\>\<] {check_last(); return yytext[0];}
-">=" {check_last(); return T_meq;}
-"<=" {check_last(); return T_leq;}
+[\+\-\*\=\#\>\<]    {return yytext[0];}
+">="                {return T_meq;}
+"<="                {return T_leq;}
 
-[\(\)\[\]\{\}\,\;\:] {check_last(); return yytext[0];}
-"<-" {check_last(); return T_assign;}
+[\(\)\[\]\{\}\,\;\:]    {return yytext[0];}
+"<-"                    {return T_assign;}
 
-\n    {check_last(); line++;}
+\n    {line++;}
 {W}+  {/*nothing*/}
 
-\$\n {check_last(); line++;}
-\$[^\$\n].*\n                      {check_last(); line++;}
-\$ {check_last(); last = 1;}
-\$[^\$\n].* {check_last(); last = 1;}
-\$\$([^\$]|(\n)|(\$[^\$]))*\$\$    {   check_last();
+\$\n                                {line++;}
+\$[^\$\n].*\n                       {line++;}
+\$                                  {check_last(); last = 1;}
+\$[^\$\n].*                         {check_last(); last = 1;}
+\$\$([^\$]|(\n)|(\$[^\$]))*\$\$     {
                                         for(int i =0; i<strlen(yytext);i++){
                                             if(yytext[i] == '\n') line++;   
                                         }
-                                }                            
+                                    }                            
+
 . {illegal_char( yytext[0] );}
 
 
@@ -101,6 +102,7 @@ void illegal_char(char character) {
 
 void check_last() {
     if(last == 1) {
+        printf("check_last() was trigered\n");
         illegal_char('$');
     }
 }
