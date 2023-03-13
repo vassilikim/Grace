@@ -102,7 +102,6 @@ void illegal_char(char character) {
 
 void check_last() {
     if(last == 1) {
-        printf("check_last() was trigered\n");
         illegal_char('$');
     }
 }
