@@ -106,14 +106,12 @@ void check_last() {
     }
 }
 
-int main (int argc, char *argv[]) {
-    yyin = fopen(argv[1], "r");
+int main () {
     int token;
     do {
         token = yylex();
         printf("token=%d, lexeme=\"%s\"\n",
         token, yytext);
     } while (token != T_eof);
-    fclose(yyin);
     return 0;
 }
