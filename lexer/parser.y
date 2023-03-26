@@ -1,6 +1,7 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 #include "lexer.hpp"
 %}
 
@@ -22,7 +23,7 @@
 %token T_while   "while"
 %token T_mod     "mod"
 
-%token T_id
+%token T_id 
 %token T_const
 %token T_constchar
 %token T_string
@@ -33,131 +34,157 @@
 
 %left "or"
 %left "and"
-%left "not"
+%precedence "not"
 %nonassoc '=' '#' '<' '>' T_leq T_meq 
 %left '+' '-'
 %left '*' "div" "mod"
-%left SIGN
+%precedence SIGN
 
 %%
 
-program: func-def
+program: 
+func-def 
 ;
 
-func-def: header local-def_list block
+func-def: 
+header local-def_list block 
 ;
 
 local-def_list: 
+
 | local-def_list local-def
 ;
 
-header: "fun" T_id "(" fpar-def fpar-def_list ")" ":" ret-type
+header: 
+"fun" T_id '(' fpar-def fpar-def_list ')' ':' ret-type 
 ;
 
 fpar-def_list: 
-| fpar-def_list ";" fpar-def_list
+
+| fpar-def_list ';' fpar-def
 ;
 
-fpar-def: T_id id_list ":" fpar-type
-| "ref" T_id id_list ":" fpar-type
+fpar-def:
+ 
+| T_id id_list ':' fpar-type 
+| "ref" T_id id_list ':' fpar-type
 ;
 
 id_list: 
-| id_list "," T_id
+
+| id_list ',' T_id
 ;
 
-data-type: "int"
+data-type: 
+"int"
 | "char"
 ;
 
-type: data-type int-const_list
+type: 
+data-type int-const_list
 ;
 
 int-const_list: 
-| int-const_list "[" T_const "]"
+
+| int-const_list '[' T_const ']'
 ;
 
-ret-type: data-type
+ret-type: 
+data-type
 | "nothing"
 ;
 
-fpar-type: data-type int-const_list
-| data-type "[" "]" int-const_list
+fpar-type: 
+data-type int-const_list 
+| data-type '[' ']' int-const_list
 ;
 
-local-def: func-def
+local-def: 
+func-def
 | func-decl
 | var-def
 ;
 
-func-decl: header ";"
+func-decl: 
+header ';'
 ;
 
-var-def: "var" T_id id_list ":" type ";"
+var-def: 
+"var" T_id id_list ':' type ';'
 ;
 
-stmt: ";"
-| l-value T_assign expr ";" 
+stmt: 
+';'
+| l-value T_assign expr ';' 
 | block 
-| func-call ";" 
+| func-call ';' 
 | "if" cond "then" stmt 
 | "if" cond "then" stmt "else" stmt 
 | "while" cond "do" stmt 
-| "return" ";"
-| "return" expr ";"
+| "return" ';'
+| "return" expr ';'
 ;
 
-block: "{" stmt_list "}"
+block: 
+'{' stmt_list '}'
 ;
 
 stmt_list: 
+
 | stmt_list stmt
 ;
 
-func-call: T_id "(" ")"
-| T_id "(" expr expr_list ")"
+func-call: 
+T_id '(' ')'
+| T_id '(' expr expr_list ')'
 ;
 
 expr_list: 
-| expr_list "," expr
+
+| expr_list ',' expr
 ;
 
-l-value: T_id
+l-value: 
+T_id
 | T_string
-| l-value "[" expr "]"
+| l-value '[' expr ']'
 ;
 
-expr: T_const
+expr: 
+T_const
 | T_constchar
 | l-value
-| "(" expr ")"
+| '(' expr ')'
 | func-call
 | sign expr %prec SIGN
 | expr operator expr
 ;
 
-sign: "+"
-| "-"
+sign: 
+'+'
+| '-'
 ;
 
-operator: "+"
-| "-"
-| "*"
+operator: 
+sign
+| '*'
 | "div"
 | "mod"
 ;
 
-cond: "(" cond ")"
+cond: 
+'(' cond ')'
 | "not" cond
 | cond "and" cond
 | cond "or" cond
 | expr cond-operator expr
 ;
 
-cond-operator: "="
-| "#"
-| "<"
-| ">"
+cond-operator: 
+'='
+| '#'
+| '<'
+| '>'
 | T_leq
 | T_meq
 ;

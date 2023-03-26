@@ -7,14 +7,14 @@
 
 #define T_eof     0000
 
-#define T_id        2000
-#define T_const     2001
-#define T_constchar 2002
-#define T_string    2003
+// #define T_id        2000
+// #define T_const     2001
+// #define T_constchar 2002
+// #define T_string    2003
 
-#define T_leq     3000
-#define T_meq     3001
-#define T_assign  3002
+// #define T_leq     3000
+// #define T_meq     3001
+// #define T_assign  3002
 
 int line = 1;
 int last = 0;
