@@ -2,25 +2,10 @@
 
 %{
 #include <string.h>
+#include "lexer.hpp"
+#include "parser.hpp"
 
 #define T_eof     0000
-#define T_and     1000
-#define T_char    1001
-#define T_div     1002
-#define T_do      1003
-#define T_else    1004
-#define T_fun     1005
-#define T_if      1006
-#define T_int     1007
-#define T_not     1008
-#define T_nothing 1009
-#define T_or      1010
-#define T_ref     1011
-#define T_return  1012
-#define T_then    1013
-#define T_var     1014
-#define T_while   1015
-#define T_mod     1016
 
 #define T_id        2000
 #define T_const     2001
@@ -106,12 +91,12 @@ void check_last() {
     }
 }
 
-int main () {
-    int token;
-    do {
-        token = yylex();
-        printf("token=%d, lexeme=\"%s\"\n",
-        token, yytext);
-    } while (token != T_eof);
-    return 0;
-}
+// int main () {
+//     int token;
+//     do {
+//         token = yylex();
+//         printf("token=%d, lexeme=\"%s\"\n",
+//         token, yytext);
+//     } while (token != T_eof);
+//     return 0;
+// }
