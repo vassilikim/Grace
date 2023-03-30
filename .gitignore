@@ -1,2 +1,7 @@
 /lexer/lexer.cpp
-/lexer/lexer
+/lexer/lexer.o
+/lexer/parser.cpp
+/lexer/parser.hpp
+/lexer/parser.o
+/lexer/parser.output
+/lexer/grace
