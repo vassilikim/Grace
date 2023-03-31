@@ -156,20 +156,13 @@ T_const
 | l-value
 | '(' expr ')'
 | func-call
-| sign expr %prec SIGN
-| expr operator expr
-;
-
-sign: 
-'+'
-| '-'
-;
-
-operator: 
-sign
-| '*'
-| "div"
-| "mod"
+| '+' expr %prec SIGN
+| '-' expr %prec SIGN
+| expr '+' expr
+| expr '-' expr
+| expr '*' expr
+| expr "div" expr
+| expr "mod" expr
 ;
 
 cond: 
@@ -177,16 +170,12 @@ cond:
 | "not" cond
 | cond "and" cond
 | cond "or" cond
-| expr cond-operator expr
-;
-
-cond-operator: 
-'='
-| '#'
-| '<'
-| '>'
-| T_leq
-| T_meq
+| expr '=' expr
+| expr '#' expr
+| expr '<' expr
+| expr '>' expr
+| expr T_leq expr
+| expr T_meq expr
 ;
 
 
