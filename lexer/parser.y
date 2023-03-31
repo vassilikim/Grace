@@ -40,6 +40,8 @@
 %left '*' "div" "mod"
 %precedence SIGN
 
+%expect 1
+
 %%
 
 program: 
@@ -95,8 +97,9 @@ data-type
 ;
 
 fpar-type: 
-data-type int-const_list 
-| data-type '[' ']' int-const_list
+data-type
+| data-type '[' ']' int-const_list 
+| data-type '[' T_const ']' int-const_list
 ;
 
 local-def: 
