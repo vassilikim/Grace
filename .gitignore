@@ -13,3 +13,5 @@
 /interpreter/parser.o
 /interpreter/parser.output
 /interpreter/grace
+
+/.vscode

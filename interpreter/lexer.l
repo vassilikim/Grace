@@ -3,18 +3,10 @@
 %{
 #include <string.h>
 #include "lexer.hpp"
+#include "ast.hpp"
 #include "parser.hpp"
 
 #define T_eof     0000
-
-// #define T_id        2000
-// #define T_const     2001
-// #define T_constchar 2002
-// #define T_string    2003
-
-// #define T_leq     3000
-// #define T_meq     3001
-// #define T_assign  3002
 
 int line = 1;
 int last = 0;
@@ -29,34 +21,35 @@ W [ \t\r]
 
 
 %%
-"and"     { return T_and;}
+"and"     {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, "and"); return T_and;}
 "char"    {return T_char;}
-"div"     {return T_div;}
+"div"     {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, "div"); return T_div;}
 "do"      {return T_do;}
 "else"    {return T_else;}
 "fun"     {return T_fun;}
 "if"      {return T_if;}
 "int"     {return T_int;}
-"mod"     {return T_mod;}
+"mod"     {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, "mod"); return T_mod;}
 "not"     {return T_not;}
 "nothing" { return T_nothing;}
-"or"      {return T_or;}
+"or"      {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, "or"); return T_or;}
 "ref"     {return T_ref;}
 "return"  {return T_return;}
 "then"    {return T_then;}
 "var"     {return T_var;}
 "while"   {return T_while;}
 
-{L}({L}|{D}|_)* {return T_id;}
-{D}+            {return T_const;}
+{L}({L}|{D}|_)* {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_id;}
+{D}+            {yylval.num = atoi(yytext); return T_const;}
 
 (\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {return T_constchar;}
 
-\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {return T_string;}
+\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {yylval.str = yytext; return T_string;}
 
-[\+\-\*\=\#\>\<]    {return yytext[0];}
-">="                {return T_meq;}
-"<="                {return T_leq;}
+[\+\-]              {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, yytext); return yytext[0];}
+[\*\=\#\>\<]        {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return yytext[0];}
+">="                {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_meq;}
+"<="                {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_leq;}
 
 [\(\)\[\]\{\}\,\;\:]    {return yytext[0];}
 "<-"                    {return T_assign;}
@@ -64,8 +57,8 @@ W [ \t\r]
 \n    {line++;}
 {W}+  {/*nothing*/}
 
-\$\n                                {check_last();line++;}
-\$[^\$\n].*\n                       {check_last();line++;}
+\$\n                                {check_last(); line++;}
+\$[^\$\n].*\n                       {check_last(); line++;}
 \$                                  {check_last(); last = 1;}
 \$[^\$\n].*                         {check_last(); last = 1;}
 \$\$([^\$]|(\n)|(\$[^\$]))*\$\$     {

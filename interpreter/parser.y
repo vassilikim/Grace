@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <string>
+#include <cstring>
 #include "lexer.hpp"
+#include "ast.hpp"
 %}
 
 %token T_and    "and"  
@@ -23,162 +26,205 @@
 %token T_while   "while"
 %token T_mod     "mod"
 
-%token T_id 
-%token T_const
-%token T_constchar
-%token T_string
+%token<str> T_id 
+%token<num> T_const
+%token<var> T_constchar
+%token<str> T_string
 
 %token T_leq
 %token T_meq 
 %token T_assign
 
-%left "or"
-%left "and"
+%left<condop> "or"
+%left<condop> "and"
 %precedence "not"
-%nonassoc '=' '#' '<' '>' T_leq T_meq 
-%left '+' '-'
-%left '*' "div" "mod"
+%nonassoc<condop> '=' '#' '<' '>' T_leq T_meq 
+%left<binop> '+' '-'
+%left<binop> '*' "div" "mod"
 %precedence SIGN
 
 %expect 1
 
+%union {
+  FuncDef *funcdef;
+  LocalDefList *localdeflist;
+  Header *header;
+  FparDefList *fpardeflist;
+  FparDef *fpardef;
+  IdList *idlist;
+  char *datatype;
+  Type *type;
+  ConstList *constlist;
+  char *rettype;
+  FparType *fpartype;
+  Func *func;
+  Stmt *stmt;
+  Block *block;
+  FuncCall *funccall;
+  ExprList *exprlist;
+  Expr *expr;
+  char var;
+  int num;
+  char *str;
+  char *binop;
+  char *condop;
+}
+
+%type<funcdef> program func-def
+%type<localdeflist> local-def_list
+%type<header> header
+%type<fpardeflist> fpar-def_list
+%type<fpardef> fpar-def
+%type<idlist> id_list
+%type<datatype> data-type
+%type<type> type
+%type<constlist> int-const_list
+%type<rettype> ret-type
+%type<fpartype> fpar-type
+%type<func> local-def func-decl var-def
+%type<stmt> stmt
+%type<block> stmt_list block
+%type<funccall> func-call
+%type<exprlist> expr_list
+%type<expr> l-value expr cond
+
 %%
 
 program: 
-func-def 
+func-def                          { std::cout << "AST: " << *$1 << std::endl; }
 ;
 
 func-def: 
-header local-def_list block 
+header local-def_list block       { $$ = new FuncDef($1, $2, $3); }
 ;
 
 local-def_list: 
-
-| local-def_list local-def
+                                  { $$ = new LocalDefList(); }
+| local-def_list local-def        { $1->append($2); $$ = $1; }
 ;
 
 header: 
-"fun" T_id '(' fpar-def fpar-def_list ')' ':' ret-type 
+"fun" T_id '(' fpar-def fpar-def_list ')' ':' ret-type    { $5->append($4); $$ = new Header($2, $5, $8); }
 ;
 
 fpar-def_list: 
-
-| fpar-def_list ';' fpar-def
+                                    { $$ = new FparDefList(); }
+| fpar-def_list ';' fpar-def        { $1->append($3); $$ = $1; }
 ;
 
 fpar-def:
- 
-| T_id id_list ':' fpar-type 
-| "ref" T_id id_list ':' fpar-type
+                                    { $$ = new FparDef(); }
+| T_id id_list ':' fpar-type        { $2->append($1); $$ = new FparDef($2, $4); }
+| "ref" T_id id_list ':' fpar-type  { $3->append($2); $$ = new FparDef($3, $5); }
 ;
 
 id_list: 
-
-| id_list ',' T_id
+                                    { $$ = new IdList(); }      
+| id_list ',' T_id                  { $1->append($3); $$ = $1; }
 ;
 
 data-type: 
-"int"
-| "char"
+"int"                               { char* c = new char[4]; strcpy(c, "int"); $$ = c; }                
+| "char"                            { char* s = new char[5]; strcpy(s, "char"); $$ = s; }
 ;
 
 type: 
-data-type int-const_list
+data-type int-const_list             { $$ = new Type($1, $2);}
 ;
 
 int-const_list: 
-
-| int-const_list '[' T_const ']'
+                                    { $$ = new ConstList(); }   
+| int-const_list '[' T_const ']'    { $1->append($3); $$ = $1; }
 ;
 
 ret-type: 
-data-type
-| "nothing"
+data-type                           { $$ = $1; }
+| "nothing"                         { char* n= new char[8]; strcpy(n, "nothing"); $$ = n; }
 ;
 
 fpar-type: 
-data-type
-| data-type '[' ']' int-const_list 
-| data-type '[' T_const ']' int-const_list
+data-type                                     { $$ = new FparType($1); }
+| data-type '[' ']' int-const_list            { $4->append(0); $$ = new FparType($1, $4); }
+| data-type '[' T_const ']' int-const_list    { $5->append($3); $$ = new FparType($1, $5); }
 ;
 
 local-def: 
-func-def
-| func-decl
-| var-def
+func-def                            { $$ = $1;}
+| func-decl                         { $$ = $1;}
+| var-def                           { $$ = $1;}
 ;
 
 func-decl: 
-header ';'
+header ';'                          { $$ = new FuncDecl($1); }
 ;
 
 var-def: 
-"var" T_id id_list ':' type ';'
+"var" T_id id_list ':' type ';'     { $3->append($2); $$ = new VarDef($3, $5); }
 ;
 
 stmt: 
-';'
-| l-value T_assign expr ';' 
-| block 
-| func-call ';' 
-| "if" cond "then" stmt 
-| "if" cond "then" stmt "else" stmt 
-| "while" cond "do" stmt 
-| "return" ';'
-| "return" expr ';'
+';'                                 { $$ = new BlankStmt(); }
+| l-value T_assign expr ';'         { $$ = new Assignment($1, $3); }
+| block                             { $$ = $1; }
+| func-call ';'                     { $$ = $1; }
+| "if" cond "then" stmt             { $$ = new If($2, $4); }
+| "if" cond "then" stmt "else" stmt { $$ = new If($2, $4, $6); }
+| "while" cond "do" stmt            { $$ = new While($2, $4); }
+| "return" ';'                      { $$ = new Return(); }
+| "return" expr ';'                 { $$ = new Return($2); }
 ;
 
 block: 
-'{' stmt_list '}'
+'{' stmt_list '}'                   { $$ = $2; }
 ;
 
 stmt_list: 
-
-| stmt_list stmt
+                                    { $$ = new Block(); }
+| stmt_list stmt                    { $1->append($2); $$ = $1; }
 ;
 
 func-call: 
-T_id '(' ')'
-| T_id '(' expr expr_list ')'
+T_id '(' ')'                        { $$ = new FuncCall($1); }
+| T_id '(' expr expr_list ')'       { $4->append($3); $$ = new FuncCall($1, $4); }
 ;
 
 expr_list: 
-
-| expr_list ',' expr
+                                    { $$ = new ExprList(); }
+| expr_list ',' expr                { $1->append($3); $$ = $1; }
 ;
 
 l-value: 
-T_id
-| T_string
-| l-value '[' expr ']'
+T_id                                { $$ = new Id($1); }
+| T_string                          { $$ = new String($1); }
+| l-value '[' expr ']'              { $$ = new Array($1, $3); }
 ;
 
 expr: 
-T_const
-| T_constchar
-| l-value
-| '(' expr ')'
-| func-call
-| '+' expr %prec SIGN
-| '-' expr %prec SIGN
-| expr '+' expr
-| expr '-' expr
-| expr '*' expr
-| expr "div" expr
-| expr "mod" expr
+T_const                             { $$ = new Const($1); }
+| T_constchar                       { $$ = new Const($1); }
+| l-value                           { $$ = $1; }
+| '(' expr ')'                      { $$ = $2; }
+| func-call                         { $$ = $1; }
+| '+' expr %prec SIGN               { $$ = new Plus($2); }
+| '-' expr %prec SIGN               { $$ = new Minus($2); }
+| expr '+' expr                     { $$ = new BinOp($1, $2, $3); }
+| expr '-' expr                     { $$ = new BinOp($1, $2, $3); }
+| expr '*' expr                     { $$ = new BinOp($1, $2, $3); }
+| expr "div" expr                   { $$ = new BinOp($1, $2, $3); }
+| expr "mod" expr                   { $$ = new BinOp($1, $2, $3); }
 ;
 
 cond: 
-'(' cond ')'
-| "not" cond
-| cond "and" cond
-| cond "or" cond
-| expr '=' expr
-| expr '#' expr
-| expr '<' expr
-| expr '>' expr
-| expr T_leq expr
-| expr T_meq expr
+'(' cond ')'                        { $$ = $2; }
+| "not" cond                        { $$ = new Not($2); }
+| cond "and" cond                   { $$ = new CondOp($1, $2, $3); }
+| cond "or" cond                    { $$ = new CondOp($1, $2, $3); }
+| expr '=' expr                     { $$ = new CondOp($1, $2, $3); }
+| expr '#' expr                     { $$ = new CondOp($1, $2, $3); }
+| expr '<' expr                     { $$ = new CondOp($1, $2, $3); }
+| expr '>' expr                     { $$ = new CondOp($1, $2, $3); }
+| expr T_leq expr                   { $$ = new CondOp($1, $2, $3); }
+| expr T_meq expr                   { $$ = new CondOp($1, $2, $3); }
 ;
 
 
