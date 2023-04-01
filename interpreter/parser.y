@@ -91,7 +91,7 @@
 %%
 
 program: 
-func-def                          { std::cout << "AST: " << *$1 << std::endl; }
+func-def                          { std::cout << "AST: " << *$1 << std::endl; delete $1; }
 ;
 
 func-def: 
