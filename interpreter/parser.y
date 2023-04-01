@@ -104,7 +104,7 @@ local-def_list:
 ;
 
 header: 
-"fun" T_id '(' fpar-def fpar-def_list ')' ':' ret-type    { $5->append($4); $$ = new Header($2, $5, $8); }
+"fun" T_id '(' fpar-def fpar-def_list ')' ':' ret-type    { $5->putinfront($4); $$ = new Header($2, $5, $8); }
 ;
 
 fpar-def_list: 
@@ -114,8 +114,8 @@ fpar-def_list:
 
 fpar-def:
                                     { $$ = new FparDef(); }
-| T_id id_list ':' fpar-type        { $2->append($1); $$ = new FparDef($2, $4); }
-| "ref" T_id id_list ':' fpar-type  { $3->append($2); $$ = new FparDef($3, $5); }
+| T_id id_list ':' fpar-type        { $2->putinfront($1); $$ = new FparDef($2, $4); }
+| "ref" T_id id_list ':' fpar-type  { $3->putinfront($2); $$ = new FparDef($3, $5); }
 ;
 
 id_list: 
@@ -144,8 +144,8 @@ data-type                           { $$ = $1; }
 
 fpar-type: 
 data-type                                     { $$ = new FparType($1); }
-| data-type '[' ']' int-const_list            { $4->append(0); $$ = new FparType($1, $4); }
-| data-type '[' T_const ']' int-const_list    { $5->append($3); $$ = new FparType($1, $5); }
+| data-type '[' ']' int-const_list            { $4->putinfront(0); $$ = new FparType($1, $4); }
+| data-type '[' T_const ']' int-const_list    { $5->putinfront($3); $$ = new FparType($1, $5); }
 ;
 
 local-def: 
@@ -159,7 +159,7 @@ header ';'                          { $$ = new FuncDecl($1); }
 ;
 
 var-def: 
-"var" T_id id_list ':' type ';'     { $3->append($2); $$ = new VarDef($3, $5); }
+"var" T_id id_list ':' type ';'     { $3->putinfront($2); $$ = new VarDef($3, $5); }
 ;
 
 stmt: 
@@ -185,7 +185,7 @@ stmt_list:
 
 func-call: 
 T_id '(' ')'                        { $$ = new FuncCall($1); }
-| T_id '(' expr expr_list ')'       { $4->append($3); $$ = new FuncCall($1, $4); }
+| T_id '(' expr expr_list ')'       { $4->putinfront($3); $$ = new FuncCall($1, $4); }
 ;
 
 expr_list: 

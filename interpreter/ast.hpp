@@ -67,7 +67,7 @@ class Array: public Expr {
 public:
   Array(Expr *l, Expr *r): lvalue(l), expr(r) {}
   virtual void printOn(std::ostream &out) const override {
-    out << "Array(" << *lvalue << *expr << ")";
+    out << "Array(" << *lvalue << ", " << *expr << ")";
   }
 private:
     Expr *lvalue;
@@ -132,6 +132,7 @@ class ExprList: public Stmt {
 public:
   ExprList(): expr_list() {}
   void append(Expr *e) { expr_list.push_back(e); }
+  void putinfront(Expr *e) { expr_list.insert(expr_list.begin(), e); }
   virtual void printOn(std::ostream &out) const override {
     out << "ExprList(";
     bool first = true;
@@ -244,6 +245,8 @@ class ConstList: public Func {
 public:
   ConstList(): const_list() {}
   void append(int n) { const_list.push_back(n); }
+  void putinfront(int n) { const_list.insert(const_list.begin(), n); }
+  int length() { return const_list.size(); }
   virtual void printOn(std::ostream &out) const override {
     out << "ConstList(";
     bool first = true;
@@ -262,8 +265,8 @@ class FparType: public Func {
 public:
   FparType(std::string s, ConstList *c = nullptr): type(s), const_list(c) {}
   virtual void printOn(std::ostream &out) const override {
-    out << "FparType(" << type << ", ";
-    if (const_list != nullptr) out << *const_list;
+    out << "FparType(" << type;
+    if (const_list != nullptr) out << ", " << *const_list;
     out << ")";
   }
 private:
@@ -275,6 +278,7 @@ class IdList: public Func {
 public:
   IdList(): id_list() {}
   void append(std::string s) { id_list.push_back(s); }
+  void putinfront(std::string s) { id_list.insert(id_list.begin(), s); }
   virtual void printOn(std::ostream &out) const override {
     out << "IdList(";
     bool first = true;
@@ -308,6 +312,7 @@ class FparDefList: public Func {
 public:
   FparDefList(): fdef_list() {}
   void append(FparDef *f) { fdef_list.push_back(f); }
+  void putinfront(FparDef *f) { fdef_list.insert(fdef_list.begin(), f); }
   virtual void printOn(std::ostream &out) const override {
     out << "FparDefList(";
     bool first = true;
@@ -366,9 +371,11 @@ private:
 
 class Type: public Func {
 public:
-  Type(std::string s, ConstList *c): type(s), const_list(c) {}
+  Type(std::string s, ConstList *c = nullptr): type(s), const_list(c) {}
   virtual void printOn(std::ostream &out) const override {
-    out << "Type(" << type << ", " << *const_list << ")";
+    out << "Type(" << type;
+    if (const_list->length() != 0) out << ", " << *const_list;
+    out << ")";
   }
 private:
   std::string type;
