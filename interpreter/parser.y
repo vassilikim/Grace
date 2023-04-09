@@ -112,7 +112,7 @@ fpar-def_list:
 
 fpar-def:
     T_id id_list ':' fpar-type          { $2->putinfront($1); $$ = new FparDef($2, $4); }
-|   "ref" T_id id_list ':' fpar-type    { $3->putinfront($2); $$ = new FparDef($3, $5); }
+|   "ref" T_id id_list ':' fpar-type    { $3->putinfront($2); $$ = new RefFparDef($3, $5); }
 ;
 
 id_list: 
