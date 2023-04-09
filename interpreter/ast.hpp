@@ -4,7 +4,6 @@
 #include <iostream>
 #include <map>
 #include <vector>
-#include <string>
 
 class AST {
 public:
@@ -64,6 +63,16 @@ public:
   }
 private:
   int num;
+};
+
+class ConstChar: public Expr {
+public:
+  ConstChar(char *c): constchar(c) {}
+  virtual void printOn(std::ostream &out) const override {
+    out << "ConstChar(" << constchar << ")";
+  }
+private:
+  char *constchar;
 };
 
 class Array: public Expr {
@@ -349,10 +358,12 @@ private:
 
 class Header: public Func {
 public:
-  Header(char *id, FparDefList *f, char *s): id(id), fpar(f), rettype(s) {}
+  Header(char *id, char *s, FparDefList *f = nullptr): id(id), fpar(f), rettype(s) {}
   ~Header() { delete id; delete fpar; delete rettype; }
   virtual void printOn(std::ostream &out) const override {
-    out << "Header(" << id << ", " << *fpar << ", " << rettype << ")";
+    out << "Header(" << id;
+    if (fpar != nullptr) out << ", " << *fpar;
+    out << ", " << rettype << ")";
   }
 private:
   char *id;

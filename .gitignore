@@ -1,3 +1,6 @@
+/lexer/lexer.cpp
+/lexer/lexer
+
 /parser/lexer.cpp
 /parser/lexer.o
 /parser/parser.cpp

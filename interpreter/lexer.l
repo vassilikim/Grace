@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %{
 #include <string.h>
@@ -42,14 +43,14 @@ W [ \t\r]
 {L}({L}|{D}|_)* {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_id;}
 {D}+            {yylval.num = atoi(yytext); return T_const;}
 
-(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {return T_constchar;}
+(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {yylval.constchar = new char[yyleng + 1]; strcpy(yylval.constchar, yytext); return T_constchar;}
 
 \"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_string;}
 
-[\+\-]              {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, yytext); return yytext[0];}
-[\*\=\#\>\<]        {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return yytext[0];}
-">="                {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_meq;}
-"<="                {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_leq;}
+[\+\-\*]                {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, yytext); return yytext[0];}
+[\=\#\>\<]              {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return yytext[0];}
+">="                    {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_meq;}
+"<="                    {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return T_leq;}
 
 [\(\)\[\]\{\}\,\;\:]    {return yytext[0];}
 "<-"                    {return T_assign;}
@@ -62,7 +63,7 @@ W [ \t\r]
 \$                                  {check_last(); last = 1;}
 \$[^\$\n].*                         {check_last(); last = 1;}
 \$\$([^\$]|(\n)|(\$[^\$]))*\$\$     {
-                                        for(int i =0; i<strlen(yytext);i++){
+                                        for(int i =0; i<int(strlen(yytext));i++){
                                             if(yytext[i] == '\n') line++;   
                                         }
                                     }                            
@@ -83,13 +84,3 @@ void check_last() {
         illegal_char('$');
     }
 }
-
-// int main () {
-//     int token;
-//     do {
-//         token = yylex();
-//         printf("token=%d, lexeme=\"%s\"\n",
-//         token, yytext);
-//     } while (token != T_eof);
-//     return 0;
-// }
