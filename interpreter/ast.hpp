@@ -335,6 +335,21 @@ private:
   FparType *fpar_type;
 };
 
+class RefFparDef: public FparDef {
+public:
+  RefFparDef(IdList *id = nullptr, FparType *f = nullptr): id_list(id), fpar_type(f) {}
+  ~RefFparDef() { delete id_list; delete fpar_type; }
+  virtual void printOn(std::ostream &out) const override {
+    out << "RefFparDef(";
+    if (id_list != nullptr) out << *id_list;
+    if (fpar_type != nullptr) out << ", " << *fpar_type;
+    out << ")";
+  }
+private:
+  IdList *id_list;
+  FparType *fpar_type;
+};
+
 
 class FparDefList: public Func {
 public:
