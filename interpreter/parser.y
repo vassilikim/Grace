@@ -101,8 +101,8 @@ local-def_list:
 ;
 
 header: 
-    "fun" T_id '(' ')' ':' ret-type                 {$$ = new Header($2, $6); }
-|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   {$$ = new Header($2, $7, $4); }
+    "fun" T_id '(' ')' ':' ret-type                 { $$ = new Header($2, new FparDefList(), $6); }
+|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   { $$ = new Header($2, $4, $7); }
 ;
 
 fpar-def_list: 

@@ -358,12 +358,10 @@ private:
 
 class Header: public Func {
 public:
-  Header(char *id, char *s, FparDefList *f = nullptr): id(id), fpar(f), rettype(s) {}
+  Header(char *id, FparDefList *f, char *s): id(id), fpar(f), rettype(s) {}
   ~Header() { delete id; delete fpar; delete rettype; }
   virtual void printOn(std::ostream &out) const override {
-    out << "Header(" << id;
-    if (fpar != nullptr) out << ", " << *fpar;
-    out << ", " << rettype << ")";
+    out << "Header(" << id << ", " << *fpar << ", " << rettype << ")";
   }
 private:
   char *id;
