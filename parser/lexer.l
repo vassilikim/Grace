@@ -1,4 +1,5 @@
 %option noyywrap
+%option nounput
 
 %{
 #include <string.h>
@@ -69,7 +70,7 @@ W [ \t\r]
 \$                                  {check_last(); last = 1;}
 \$[^\$\n].*                         {check_last(); last = 1;}
 \$\$([^\$]|(\n)|(\$[^\$]))*\$\$     {
-                                        for(int i =0; i<strlen(yytext);i++){
+                                        for(int i =0; i<int(strlen(yytext));i++){
                                             if(yytext[i] == '\n') line++;   
                                         }
                                     }                            
