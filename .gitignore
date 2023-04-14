@@ -16,5 +16,6 @@
 /interpreter/parser.o
 /interpreter/parser.output
 /interpreter/grace
+/interpreter/testing.sh
 
 /.vscode
