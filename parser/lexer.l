@@ -2,14 +2,25 @@
 
 %{
 #include <string.h>
-#include <cstdio>
-#include <cstdlib>
 #include "lexer.hpp"
 #include "parser.hpp"
 
+#define T_eof     0000
+
+// #define T_id        2000
+// #define T_const     2001
+// #define T_constchar 2002
+// #define T_string    2003
+
+// #define T_leq     3000
+// #define T_meq     3001
+// #define T_assign  3002
 
 int line = 1;
 int last = 0;
+
+void illegal_char(char character);
+void check_last();
 %}
 
 L [a-zA-Z]
@@ -18,7 +29,7 @@ W [ \t\r]
 
 
 %%
-"and"     {return T_and;}
+"and"     { return T_and;}
 "char"    {return T_char;}
 "div"     {return T_div;}
 "do"      {return T_do;}
@@ -58,7 +69,7 @@ W [ \t\r]
 \$                                  {check_last(); last = 1;}
 \$[^\$\n].*                         {check_last(); last = 1;}
 \$\$([^\$]|(\n)|(\$[^\$]))*\$\$     {
-                                        for(int i =0; i<int(strlen(yytext));i++){
+                                        for(int i =0; i<strlen(yytext);i++){
                                             if(yytext[i] == '\n') line++;   
                                         }
                                     }                            
@@ -69,8 +80,8 @@ W [ \t\r]
 %%
 void illegal_char(char character) {
     if (character == '$')
-        printf("expected \"$$\" at the end of the comment -- line: %d", line);
-    else printf("illegal character: %c -- line: %d", character, line);
+        printf("expected \"$$\" at the end of the comment -- line: %d\n", line);
+    else printf("illegal character: %c -- line: %d\n", character, line);
     exit(1);
 }
 
@@ -79,3 +90,13 @@ void check_last() {
         illegal_char('$');
     }
 }
+
+// int main () {
+//     int token;
+//     do {
+//         token = yylex();
+//         printf("token=%d, lexeme=\"%s\"\n",
+//         token, yytext);
+//     } while (token != T_eof);
+//     return 0;
+// }

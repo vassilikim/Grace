@@ -1,7 +1,6 @@
 /lexer/lexer.cpp
 /lexer/lexer
 
-
 /parser/lexer.cpp
 /parser/lexer.o
 /parser/parser.cpp
@@ -9,3 +8,14 @@
 /parser/parser.o
 /parser/parser.output
 /parser/grace
+
+/interpreter/lexer.cpp
+/interpreter/lexer.o
+/interpreter/parser.cpp
+/interpreter/parser.hpp
+/interpreter/parser.o
+/interpreter/parser.output
+/interpreter/grace
+/interpreter/testing.sh
+
+/.vscode
