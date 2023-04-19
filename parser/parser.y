@@ -185,7 +185,7 @@ cond:
 %%
 
 void yyerror(const char *msg){
-  fprintf(stderr, "Syntax Error: %s\n", msg);
+  fprintf(stderr, "%s\n", msg);
   exit(42);
 }
 
