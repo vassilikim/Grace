@@ -7,13 +7,17 @@
 #include <vector>
 
 
+extern int yylineno;
+
+
 //////////////////  AST ///////////////////////////
 
 class AST {
 public:
   virtual void printOn(std::ostream &out) const = 0;
   virtual ~AST() {}
-   virtual void sem(){}
+  virtual void sem(){}
+   
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
@@ -86,8 +90,10 @@ public:
   }
   void insert(char *c, char* t) {
     if (locals.find(c) != locals.end()) {
-      printf("\033[1;31mError:\t\033[0m");
-      std::cerr << "Variable \"" << c << "\" is already declared in the scope.\n";
+      printf("\033[1;31merror:\n\t\033[0m");
+      std::cerr << "Variable " ;
+      printf("\033[1;35m%s\033[0m", c);
+      std::cerr << " is declared multiple times under the same scope.\n";
       exit(1);
     }
     locals[c] = t;
@@ -104,13 +110,16 @@ public:
     scopes.push_back(Scope());
   }
   void closeScope() { scopes.pop_back(); };
-  std::string lookup(char *c) {
+  std::string lookup(char *c, int line) {
     for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
       std::string e = i->lookup(c);
       if (e != "null") return e;
     }
-    printf("\033[1;31mError:\t\033[0m");
-    std::cerr << "Unknown variable \"" << c << "\".\n";
+    printf("\033[1;31merror:\n\t\033[0m");
+    std::cerr << "Unknown variable " ;
+    printf("\033[1;35m%s\033[0m", c);
+    printf(" -- line: ");
+    printf("\033[1;36m%d\n\033[0m", line);
     exit(1);
   }
   int getSizeOfCurrentScope() const { return scopes.back().getSize(); }
@@ -126,14 +135,15 @@ static SymbolTable st;
 
 class Id: public Expr {
 public:
-  Id(char *s): str(s) {}
+  Id(char *s, int l): str(s) {line = l;}
   ~Id() { delete str; }
   virtual void printOn(std::ostream &out) const override {
     out << "Id(" << str << ")";
   }
-  virtual std::string getType() { return st.lookup(str);}
+  virtual std::string getType() { return st.lookup(str, line);}
 private:
-    char *str;
+  int line;
+  char *str;
 };
 
 class String: public Expr {
@@ -184,69 +194,89 @@ private:
 
 class Plus: public Expr {
 public:
-  Plus(Expr *n): expr(n) {}
+  Plus(Expr *n, int l): expr(n) {line=l;}
   ~Plus() { delete expr; }
   virtual void printOn(std::ostream &out) const override {
     out << "Plus(" << *expr << ")";
   }
   virtual std::string getType() {
     if(expr->getType()=="int") return "int";
-    printf("\033[1;31mError:\t\033[0m");
-    printf("The operator \'+\' must be used with a integer.\n");
+    printf("\033[1;31merror:\n\t\033[0m");
+    printf("The operator \'");
+    printf("\033[1;35m+\033[0m");
+    printf("\' must be used with a integer.");
+    printf("\' -- line: ");
+    printf("\033[1;36m%d\n\033[0m", line);
     exit(1);
   }
 private:
+  int line;
   Expr *expr;
 };
 
 class Minus: public Expr {
 public:
-  Minus(Expr *n): expr(n) {}
+  Minus(Expr *n, int l): expr(n) {line=l;}
   ~Minus() { delete expr; }
   virtual void printOn(std::ostream &out) const override {
     out << "Minus(" << *expr << ")";
   }
   virtual std::string getType() {
     if(expr->getType()=="int") return "int";
-    printf("\033[1;31mError:\t\033[0m");
-    printf("The operator \'-\' must be used with a integer.\n");
+    printf("\033[1;31merror:\n\t\033[0m");
+    printf("The operator \'");
+    printf("\033[1;35m-\033[0m");
+    printf("\' must be used with a integer.");
+    printf("\' -- line: ");
+    printf("\033[1;36m%d\n\033[0m", line);
     exit(1);
   }
 private:
+  int line;
   Expr *expr;
 };
 
 class Not: public Expr {
 public:
-  Not(Expr *n): expr(n) {}
+  Not(Expr *n, int l): expr(n) {line = l;}
   ~Not() { delete expr; }
   virtual void printOn(std::ostream &out) const override {
     out << "Not(" << *expr << ")";
   }
   virtual std::string getType() {
     if(expr->getType()=="bool") return "bool";
-    printf("\033[1;31mError:\t\033[0m");
-    printf("Logic operators must apply on conditions.\n");
+    printf("\033[1;31merror:\n\t\033[0m");
+    printf("Logic operator \'");
+    printf("\033[1;35mnot\033[0m");
+    printf("\' must apply on conditions.");
+    printf("\' -- line: ");
+    printf("\033[1;36m%d\n\033[0m", line);
     exit(1);
   }
 private:
+  int line;
   Expr *expr;
 };
 
 class BinOp: public Expr {
 public:
-  BinOp(Expr *l, char *o, Expr *r): left(l), op(o), right(r) {}
+  BinOp(Expr *l, char *o, Expr *r, int li): left(l), op(o), right(r) {line=li;}
   ~BinOp() { delete left; delete right; delete op; }
   virtual void printOn(std::ostream &out) const override {
     out << op << "(" << *left << ", " << *right << ")";
   }
   virtual std::string getType() {
     if(left->getType()=="int"&&right->getType()=="int") return "int";
-    printf("\033[1;31mError:\t\033[0m");
-    printf("Arithetic operators must apply on integers.\n");
+    printf("\033[1;31merror:\n\t\033[0m");
+    printf("Arithmetic operator \'");
+    printf("\033[1;35m%s\033[0m", op);
+    printf("\' must apply on integers.");
+    printf("\' -- line: ");
+    printf("\033[1;36m%d\n\033[0m", line);
     exit(1);
   }
 private:
+  int line;
   Expr *left;
   char *op;
   Expr *right;
@@ -254,7 +284,7 @@ private:
 
 class CondOp: public Expr {
 public:
-  CondOp(Expr *l, char *o, Expr *r): left(l), op(o), right(r) {}
+  CondOp(Expr *l, char *o, Expr *r, int li): left(l), op(o), right(r) {line=li;}
   ~CondOp() { delete left; delete right; delete op; }
   virtual void printOn(std::ostream &out) const override {
     out << op << "(" << *left << ", " << *right << ")";
@@ -263,19 +293,28 @@ public:
     //exw grapsei etsi to if giati kati epaize me to string kai to char *
     if(op[0]=='a'||op[0]=='o'){ 
       if(left->getType()=="bool"&&right->getType()=="bool") return "bool";
-      printf("\033[1;31mError:\t\033[0m");
-      printf("Logic operators must apply on conditions.\n");
+      printf("\033[1;31merror:\n\t\033[0m");
+      printf("Logic operator \'");
+      printf("\033[1;35m%s\033[0m", op);
+      printf("\' must apply on conditons.");
+      printf("\' -- line: ");
+      printf("\033[1;36m%d\n\033[0m", line);
       exit(1);
     }
     else{
       if(left->getType()=="int"&&right->getType()=="int") return "bool";
       if(left->getType()=="char"&&right->getType()=="char") return "bool";
-      printf("\033[1;31mError:\t\033[0m");
-      printf("Comparators must apply on variables or constants of the same type.\n");
+      printf("\033[1;31merror:\n\t\033[0m");
+      printf("Logic operator \'");
+      printf("\033[1;35m%s\033[0m", op);
+      printf("\' must apply on variables or constants of the same type.");
+      printf("\' -- line: ");
+      printf("\033[1;36m%d\n\033[0m", line);
       exit(1);
     }
   }
 private:
+  int line;
   Expr *left;
   char *op;
   Expr *right;
@@ -332,27 +371,33 @@ private:
 
 class Assignment: public Stmt {
 public:
-  Assignment(Expr *e1, Expr *e2): expr1(e1),  expr2(e2) {}
+  Assignment(Expr *e1, Expr *e2, int l): expr1(e1),  expr2(e2) {line=l;}
   ~Assignment() { delete expr1; delete expr2; }
   virtual void printOn(std::ostream &out) const override {
     out << "Assignment(" << *expr1 << ", " << *expr2 << ")";
   }
   virtual void sem(){
     if(expr1->getType()!=expr2->getType()){
-      printf("\033[1;31mError:\t\033[0m");
-      printf("Invalid assignment\n");
+      printf("\033[1;31merror:\n\t\033[0m");
+      printf("Invalid assignment ");
+      printf("\033[1;35m%s\033[0m", expr1->getType().c_str());
+      printf(" <- ");
+      printf("\033[1;35m%s\033[0m", expr2->getType().c_str());
+      printf(" -- line: ");
+      printf("\033[1;36m%d\n\033[0m", line);
       exit(1);
     }
   }
 private:
+  int line;
   Expr *expr1;
   Expr *expr2;
 };
 
 class If: public Stmt {
 public:
-  If(Expr *c, Stmt *s1, Stmt *s2 = nullptr):
-    cond(c), stmt1(s1), stmt2(s2) {}
+  If(Expr *c, Stmt *s1, int l, Stmt *s2 = nullptr):
+    cond(c), stmt1(s1), stmt2(s2) { line =l; }
   ~If() { delete cond; delete stmt1; delete stmt2; }
   virtual void printOn(std::ostream &out) const override {
     out << "If(" << *cond << ", " << *stmt1;
@@ -361,14 +406,17 @@ public:
   }
   virtual void sem(){
     if (cond->getType()!="bool"){
-      printf("\033[1;31mError:\t\033[0m");
+      printf("\033[1;31merror:\n\t\033[0m");
       printf("If-statements must start with a condition.\n");
+      printf(" -- line: ");
+      printf("\033[1;36m%d\n\033[0m", line);
       exit(1);
     }
     stmt1->sem();
     if (stmt2 != nullptr) stmt2->sem();
   }
 private:
+  int line;
   Expr *cond;
   Stmt *stmt1;
   Stmt *stmt2;
@@ -376,20 +424,23 @@ private:
 
 class While: public Stmt {
 public:
-  While(Expr *e, Stmt *s): expr(e), stmt(s) {}
+  While(Expr *e, Stmt *s, int l): expr(e), stmt(s) {line=l;}
   ~While() { delete expr; delete stmt; }
   virtual void printOn(std::ostream &out) const override {
     out << "While(" << *expr << ", " << *stmt << ")";
   }
   virtual void sem(){
     if(expr->getType()!="bool"){
-      printf("\033[1;31mError:\t\033[0m");
+      printf("\033[1;31merror:\n\t\033[0m");
       printf("While-statements must start with a condition.\n");
+      printf(" -- line: ");
+      printf("\033[1;36m%d\n\033[0m", line);
       exit(1);
     }
     stmt->sem();
   }
 private:
+  int line;
   Expr *expr;
   Stmt *stmt;
 };

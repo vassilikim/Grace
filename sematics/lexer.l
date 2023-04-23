@@ -1,11 +1,13 @@
 %option noyywrap
 %option nounput
+%option yylineno
 
 %{
 #include <string.h>
 #include "lexer.hpp"
 #include "ast.hpp"
 #include "parser.hpp"
+
 
 #define T_eof     0000
 
@@ -73,11 +75,18 @@ W [ \t\r]
 
 %%
 void illegal_char(char character) {
-    printf("\033[1;31mLexical Error:\t\033[0m");
-    if (character == '$')
-        printf("expected \"$$\" at the end of the comment -- line: ");
-    else printf("illegal character: \'%c\' -- line: ", character);
-    printf("\033[1;35m%d\n\033[0m", line);
+    printf("\033[1;31mlexical error:\n\t\033[0m");
+    if (character == '$'){
+        printf("Expected \"");
+        printf("\033[1;35m%s\033[0m", "$$");
+        printf("\" at the end of the comment -- line: ");
+    }
+    else{
+        printf("Illegal character: \'");
+        printf("\033[1;35m%c\033[0m", character);
+        printf("\' -- line: ");
+    }
+    printf("\033[1;36m%d\n\033[0m", yylineno);
     exit(1);
 }
 

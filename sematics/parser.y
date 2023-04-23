@@ -2,7 +2,10 @@
 #include <cstring>
 #include "lexer.hpp"
 #include "ast.hpp"
+extern int yylineno;
+extern char *yytext;
 %}
+%locations
 
 %token T_and    "and"  
 %token T_char   "char"
@@ -88,10 +91,10 @@
 %%
 
 program: 
-    func-def                            {   std::cout << "AST: " << *$1 << std::endl; 
-                                            $1;
+    func-def                            {   FuncDef *parsingTree = $1;
+                                            //std::cout << "AST: " << *$1 << std::endl; 
                                             printf("\033[1;32mSucessful parsing.\n\033[0m");
-                                            $1->sem(); delete $1; }
+                                            parsingTree->sem(); delete $1; }
 ;
 
 func-def: 
@@ -164,12 +167,12 @@ var-def:
 
 stmt: 
     ';'                                 { $$ = new BlankStmt(); }
-|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3); }
+|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3, yylineno); }
 |   block                               { $$ = $1; }
 |   func-call ';'                       { $$ = $1; }
-|   "if" cond "then" stmt               { $$ = new If($2, $4); }
-|   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, $6); }
-|   "while" cond "do" stmt              { $$ = new While($2, $4); }
+|   "if" cond "then" stmt               { $$ = new If($2, $4, yylineno); }
+|   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, yylineno, $6); }
+|   "while" cond "do" stmt              { $$ = new While($2, $4, yylineno); }
 |   "return" ';'                        { $$ = new Return(); }
 |   "return" expr ';'                   { $$ = new Return($2); }
 ;
@@ -194,7 +197,7 @@ expr_list:
 ;
 
 l-value: 
-    T_id                                { $$ = new Id($1); }
+    T_id                                { $$ = new Id($1, yylineno); }
 |   T_string                            { $$ = new String($1); }
 |   l-value '[' expr ']'                { $$ = new Array($1, $3); }
 ;
@@ -205,33 +208,40 @@ expr:
 |   l-value                             { $$ = $1; }
 |   '(' expr ')'                        { $$ = $2; }
 |   func-call                           { $$ = $1; }
-|   '+' expr %prec SIGN                 { $$ = new Plus($2); }
-|   '-' expr %prec SIGN                 { $$ = new Minus($2); }
-|   expr '+' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr '-' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr '*' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr "div" expr                     { $$ = new BinOp($1, $2, $3); }
-|   expr "mod" expr                     { $$ = new BinOp($1, $2, $3); }
+|   '+' expr %prec SIGN                 { $$ = new Plus($2, yylineno); }
+|   '-' expr %prec SIGN                 { $$ = new Minus($2, yylineno); }
+|   expr '+' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr '-' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr '*' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr "div" expr                     { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr "mod" expr                     { $$ = new BinOp($1, $2, $3, yylineno); }
 ;
 
 cond: 
     '(' cond ')'                        { $$ = $2; }
-|   "not" cond                          { $$ = new Not($2); }
-|   cond "and" cond                     { $$ = new CondOp($1, $2, $3); }
-|   cond "or" cond                      { $$ = new CondOp($1, $2, $3); }
-|   expr '=' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '#' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '<' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '>' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr "<=" expr                      { $$ = new CondOp($1, $2, $3); }
-|   expr ">=" expr                      { $$ = new CondOp($1, $2, $3); }
+|   "not" cond                          { $$ = new Not($2, yylineno); }
+|   cond "and" cond                     { $$ = new CondOp($1, $2, $3, yylineno); }
+|   cond "or" cond                      { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '=' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '#' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '<' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '>' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr "<=" expr                      { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr ">=" expr                      { $$ = new CondOp($1, $2, $3, yylineno); }
 ;
 
 
 %%
 
 void yyerror(const char *msg){
-  printf("\033[1;31m%s\n\033[0m", msg);
+
+
+
+  printf("\033[1;31m%s:\n\t\033[0m", msg);
+  printf("Cannot parse token: ");
+  printf("\033[1;35m%s\033[0m", yytext);
+  printf(" -- line: ");
+  printf("\033[1;36m%d\n\033[0m", yylineno);
   exit(42);
 }
 

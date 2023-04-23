@@ -1,0 +1,5 @@
+fun main(x:int): nothing{
+    while x>42 do{
+        x<-x-1;
+    }
+}
