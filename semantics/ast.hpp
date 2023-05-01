@@ -22,38 +22,6 @@ inline std::ostream& operator<<(std::ostream &out, Datatype t) {
   return out;
 }
 
-static void showSemanticError(int errorCode, int line, char* op) {
-  printf("\033[1;31merror:\n\t\033[0m");
-  if (errorCode == 1) {
-    printf("The size of an array must be an integer.");
-  } else if (errorCode == 2) {
-    printf("The parameters in an array call must be integers.");
-  } else if (errorCode == 3) {
-    printf("The operator \'");
-    printf("\033[1;35m%s\033[0m", op);
-    printf("\' must be used with a integer.");
-  } else if (errorCode == 4) {
-    printf("Logic operator \'");
-    printf("\033[1;35m%s\033[0m", op);
-    printf("\' must apply on conditions.");
-  } else if (errorCode == 5) {
-    printf("Arithmetic operator \'");
-    printf("\033[1;35m%s\033[0m", op);
-    printf("\' must apply on integers.");
-  } else if (errorCode == 6) {
-    printf("Logic operator \'");
-    printf("\033[1;35m%s\033[0m", op);
-    printf("\' must apply on variables or constants of the same type.");
-  } else if (errorCode == 7) {
-    printf("If-statements must start with a condition.\n");
-  } else if (errorCode == 8) {
-    printf("While-statements must start with a condition.\n");
-  }
-  printf("\' -- line: ");
-  printf("\033[1;36m%d\n\033[0m", line);
-  exit(1);
-}
-
 class AST {
 public:
   virtual void printOn(std::ostream &out) const = 0;
@@ -74,6 +42,7 @@ public:
       showSemanticError(code, line, op);
     }
   }
+  virtual char* getName() {}
 protected:
   Datatype type;
 };
@@ -102,29 +71,29 @@ private:
 
 class ConstList: public Expr {
 public:
-  ConstList(int l): const_list(), line(l) {}
-  ~ConstList() { for (Const *c : const_list) delete c;}
-  void append(Const * n) { const_list.push_back(n); }
-  void putinfront(Const * n) { const_list.insert(const_list.begin(), n); }
+  ConstList(): const_list() {}
+  void append(int n) { const_list.push_back(n); }
+  void putinfront(int n) { const_list.insert(const_list.begin(), n); }
   int length() { return const_list.size(); }
   virtual void printOn(std::ostream &out) const override {
     out << "ConstList(";
     bool first = true;
-    for (Const * n: const_list) {
+    for (int n: const_list) {
       if (!first) out << ", ";
       first = false;
-      out << *n;
+      out << n;
     }
     out << ")";
   }
-  virtual void sem() override {
-    for (Const *c : const_list) {
-      c->type_check(TYPE_int, 1, line);
+  std::vector<int> getConstList() {
+    std::vector<int> v;
+    for (int c : const_list) {
+      v.push_back(c);
     }
+    return v;
   }
 private:
-  std::vector<Const *> const_list;
-  int line;
+  std::vector<int> const_list;
 };
 
 class Type: public Func {
@@ -137,10 +106,14 @@ public:
     if (const_list->length() != 0) out << ", " << *const_list;
     out << ")";
   }
-  virtual void sem() override {
-    const_list->sem();
+  Datatype getType() {
+    return type;
   }
-
+  std::vector<int> getConstList() {
+    if (const_list != nullptr)
+      return const_list->getConstList();
+    return {};
+  }
 private:
   Datatype type;
   ConstList *const_list;
@@ -156,6 +129,9 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "Id(" << str << ")";
   }
+  virtual char *getName() override {
+    return str;
+  }
 private:
   char *str;
   int line;
@@ -168,8 +144,8 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "String(" << str << ")";
   }
-  virtual void sem() override {
-    type = TYPE_string;
+  virtual char *getName() override {
+    return str;
   }
 private:
     char *str;
@@ -198,6 +174,9 @@ public:
   virtual void sem() override {
     lvalue->sem();
     expr->type_check(TYPE_int, 2, line);
+  }
+  virtual char *getName() override {
+    return lvalue->getName();
   }
 private:
     Expr *lvalue;
@@ -350,30 +329,21 @@ private:
 
 class Assignment: public Stmt {
 public:
-  Assignment(Expr *e1, Expr *e2): expr1(e1),  expr2(e2) {}
+  Assignment(Expr *e1, Expr *e2, int l): expr1(e1),  expr2(e2), line(l) {}
   ~Assignment() { delete expr1; delete expr2; }
   virtual void printOn(std::ostream &out) const override {
     out << "Assignment(" << *expr1 << ", " << *expr2 << ")";
   }
-  // virtual void sem(){
-  //   if(expr1->getType()!=expr2->getType()){
-  //     printf("\033[1;31merror:\n\t\033[0m");
-  //     printf("Invalid assignment ");
-  //     printf("\033[1;35m%s\033[0m", expr1->getType().c_str());
-  //     printf(" <- ");
-  //     printf("\033[1;35m%s\033[0m", expr2->getType().c_str());
-  //     printf(" -- line: ");
-  //     printf("\033[1;36m%d\n\033[0m", line);
-  //     exit(1);
-  //   }
-  // }
   virtual void sem() override {
     expr1->sem();
     expr2->sem();
+    SymbolEntry * e = st.lookup(expr1->getName(), line);
+    expr2->type_check(e->getType(), 9, line);
   }
 private:
   Expr *expr1;
   Expr *expr2;
+  int line;
 };
 
 class If: public Stmt {
@@ -466,8 +436,13 @@ public:
     if (const_list != nullptr) out << ", " << *const_list;
     out << ")";
   }
-  virtual void sem() override {
-    if (const_list != nullptr) const_list->sem();
+  Datatype getType() {
+    return type;
+  }
+  std::vector<int> getConstList() {
+    if (const_list != nullptr)
+      return const_list->getConstList();
+    return {};
   }
 private:
   Datatype type;
@@ -477,29 +452,32 @@ private:
 class IdList: public Func {
 public:
   IdList(): id_list() {}
-  ~IdList() { for (Id *s : id_list) delete s; }
-  void append(Id *s) { id_list.push_back(s); }
-  void putinfront(Id *s) { id_list.insert(id_list.begin(), s); }
+  void append(char *s) { id_list.push_back(s); }
+  void putinfront(char *s) { id_list.insert(id_list.begin(), s); }
   virtual void printOn(std::ostream &out) const override {
     out << "IdList(";
     bool first = true;
-    for (Id *s: id_list) {
+    for (char *s: id_list) {
       if (!first) out << ", ";
       first = false;
-      out << *s;
+      out << s;
     }
     out << ")";
   }
-  virtual void sem() override {
-    for(Id* id: id_list) id->sem();
-  }
+  std::vector<char *> getIdList() {
+    std::vector<char *> v;
+    for (char *id : id_list) {
+      v.push_back(id);
+    }
+    return v;
+  };
 private:
-  std::vector<Id *> id_list;
+  std::vector<char *> id_list;
 };
 
 class FparDef: public Func {
 public:
-  FparDef(IdList *id = nullptr, FparType *f = nullptr): id_list(id), fpar_type(f) {}
+  FparDef(int l = -1, IdList *id = nullptr, FparType *f = nullptr): line(l), id_list(id), fpar_type(f) {}
   ~FparDef() { delete id_list; delete fpar_type; }
   virtual void printOn(std::ostream &out) const override {
     out << "FparDef(";
@@ -508,19 +486,46 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    if (id_list != nullptr)
-      id_list->sem();
-    if (fpar_type != nullptr)
-      fpar_type->sem();
+    if (id_list != nullptr && fpar_type != nullptr) {
+      Datatype t = fpar_type->getType();
+      std::vector<int> v = fpar_type->getConstList();
+      if (v.size() == 0) {
+        for (char *c : id_list->getIdList()) {
+        st.insertVar(c, t, line);
+      }
+      } else {
+        for (char *c : id_list->getIdList()) {
+        st.insertArray(c, t, v, line);
+        }
+      }
+    }
+  }
+  std::vector<SymbolEntry> getSymbolEntry() {
+    if (id_list != nullptr && fpar_type != nullptr) {
+      std::vector<SymbolEntry> s;
+      Datatype t = fpar_type->getType();
+      std::vector<int> v = fpar_type->getConstList();
+      if (v.size() == 0) {
+        for (char *c : id_list->getIdList()) {
+          s.push_back(VarEntry(t));
+        }
+      } else {
+        for (char *c : id_list->getIdList()) {
+          s.push_back(ArrayEntry(t, v.size(), v));
+        }
+      }
+      return s;
+    }
   }
 private:
   IdList *id_list;
   FparType *fpar_type;
+  int line;
 };
 
 class RefFparDef: public FparDef {
 public:
-  RefFparDef(IdList *id = nullptr, FparType *f = nullptr): id_list(id), fpar_type(f) {}
+  RefFparDef(int l, IdList *id = nullptr, FparType *f = nullptr): line(l), id_list(id), fpar_type(f) {}
   ~RefFparDef() { delete id_list; delete fpar_type; }
   virtual void printOn(std::ostream &out) const override {
     out << "RefFparDef(";
@@ -529,14 +534,41 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    if (id_list != nullptr)
-      id_list->sem();
-    if (fpar_type != nullptr)
-      fpar_type->sem();
+    if (id_list != nullptr && fpar_type != nullptr) {
+      Datatype t = fpar_type->getType();
+      std::vector<int> v = fpar_type->getConstList();
+      if (v.size() == 0) {
+        for (char *c : id_list->getIdList()) {
+        st.insertVar(c, t, line);
+      }
+      } else {
+        for (char *c : id_list->getIdList()) {
+        st.insertArray(c, t, v, line);
+        }
+      }
+    }
+  }
+  std::vector<SymbolEntry> getSymbolEntry() {
+    if (id_list != nullptr && fpar_type != nullptr) {
+      std::vector<SymbolEntry> s;
+      Datatype t = fpar_type->getType();
+      std::vector<int> v = fpar_type->getConstList();
+      if (v.size() == 0) {
+        for (char *c : id_list->getIdList()) {
+          s.push_back(VarEntry(t));
+        }
+      } else {
+        for (char *c : id_list->getIdList()) {
+          s.push_back(ArrayEntry(t, v.size(), v));
+        }
+      }
+      return s;
+    }
   }
 private:
   IdList *id_list;
   FparType *fpar_type;
+  int line;
 };
 
 
@@ -559,24 +591,36 @@ public:
   virtual void sem() override {
     for(FparDef *fdef_elem : fdef_list) fdef_elem->sem();
   }
+  std::vector<SymbolEntry> getSymbolEntries() {
+    std::vector<SymbolEntry> s = {};
+    for (FparDef *f : fdef_list) {
+      std::vector<SymbolEntry> a = f->getSymbolEntry();
+      s.reserve(s.size() + a.size());
+      s.insert(s.end(), a.begin(), a.end());
+    return s;
+    }
+  }
 private:
   std::vector<FparDef *> fdef_list;
 };
 
 class Header: public Func {
 public:
-  Header(char *id, FparDefList *f, Datatype s): id(id), fpar(f), rettype(s) {}
+  Header(char *id, FparDefList *f, Datatype s, int l): id(id), fpar(f), rettype(s), line(l) {}
   ~Header() { delete id; delete fpar; }
   virtual void printOn(std::ostream &out) const override {
     out << "Header(" << id << ", " << *fpar << ", " << rettype << ")";
   }
-  virtual void sem() override { 
+  virtual void sem() override {
+    st.addScopeNameAndType(id, rettype);
+    st.insertFunctionToPreviousScope(id, rettype, fpar->getSymbolEntries(), line);
     fpar->sem(); 
   }
 private:
   char *id;
   FparDefList *fpar;
   Datatype rettype;
+  int line;
 };
 
 class LocalDefList: public Func {
@@ -603,17 +647,17 @@ private:
 
 class FuncDef: public Func {
 public:
-  FuncDef(Header *h, LocalDefList *l, Block *b): head(h), local(l), block(b) {SymbolTable();}
+  FuncDef(Header *h, LocalDefList *l, Block *b): head(h), local(l), block(b) {}
   ~FuncDef() { delete head; delete local; delete block; }
   virtual void printOn(std::ostream &out) const override {
     out << "FuncDef(" << *head << ", " << *local << ", " << *block << ")";
   }
   virtual void sem() override {
-    // st.openScope();
+    st.openScope();
     head->sem();
     local->sem();
     block->sem();
-    // st.closeScope();
+    st.closeScope();
   }
 private:
   Header *head;
@@ -638,18 +682,28 @@ private:
 
 class VarDef: public Func {
 public:
-  VarDef(IdList *id, Type *t): id_list(id), type(t) {}
+  VarDef(IdList *id, Type *t, int l): id_list(id), type(t), line(l) {}
   ~VarDef() { delete id_list; delete type; }
   virtual void printOn(std::ostream &out) const override {
     out << "VarDef(" << *id_list << ", " << *type << ")";
   }
   virtual void sem() override {
-    id_list->sem();
-    type->sem();
+    Datatype t = type->getType();
+    std::vector<int> v = type->getConstList();
+    if (v.size() == 0) {
+      for (char *c : id_list->getIdList()) {
+      st.insertVar(c, t, line);
+    }
+    } else {
+      for (char *c : id_list->getIdList()) {
+      st.insertArray(c, t, v, line);
+      }
+    }
   }
 private:
   IdList *id_list;
   Type *type;
+  int line;
 };
 
 

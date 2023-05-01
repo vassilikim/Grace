@@ -94,7 +94,7 @@ SymbolTable st;
 
 program: 
     func-def                            {   FuncDef *parsingTree = $1;
-                                            // std::cout << "AST: " << *$1 << std::endl; 
+                                            std::cout << "AST: " << *$1 << std::endl; 
                                             printf("\033[1;32mSucessful parsing.\n\033[0m");
                                             parsingTree->sem(); delete $1; }
 ;
@@ -109,8 +109,8 @@ local-def_list:
 ;
 
 header: 
-    "fun" T_id '(' ')' ':' ret-type                 { $$ = new Header($2, new FparDefList(), $6); }
-|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   { $$ = new Header($2, $4, $7); }
+    "fun" T_id '(' ')' ':' ret-type                 { $$ = new Header($2, new FparDefList(), $6, yylineno); }
+|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   { $$ = new Header($2, $4, $7, yylineno); }
 ;
 
 fpar-def_list: 
@@ -119,13 +119,13 @@ fpar-def_list:
 ;
 
 fpar-def:
-    T_id id_list ':' fpar-type          { Id* id = new Id($1, yylineno); $2->putinfront(id); $$ = new FparDef($2, $4); }
-|   "ref" T_id id_list ':' fpar-type    { Id* id = new Id($2, yylineno); $3->putinfront(id); $$ = new RefFparDef($3, $5); }
+    T_id id_list ':' fpar-type          { $2->putinfront($1); $$ = new FparDef(yylineno, $2, $4); }
+|   "ref" T_id id_list ':' fpar-type    { $3->putinfront($2); $$ = new RefFparDef(yylineno, $3, $5); }
 ;
 
 id_list: 
     /*nothing*/                         { $$ = new IdList(); }      
-|   id_list ',' T_id                    { Id* id = new Id($3, yylineno); $1->append(id); $$ = $1; }
+|   id_list ',' T_id                    { $1->append($3); $$ = $1; }
 ;
 
 data-type: 
@@ -138,8 +138,8 @@ type:
 ;
 
 int-const_list: 
-    /*nothing*/                         { $$ = new ConstList(yylineno); }   
-|   int-const_list '[' T_const ']'      { Const* c = new Const($3); $1->append(c); $$ = $1; }
+    /*nothing*/                         { $$ = new ConstList(); }   
+|   int-const_list '[' T_const ']'      { $1->append($3); $$ = $1; }
 ;
 
 ret-type: 
@@ -149,8 +149,8 @@ ret-type:
 
 fpar-type: 
     data-type                                   { $$ = new FparType($1); }
-|   data-type '[' ']' int-const_list            { Const* c = new Const(0); $4->putinfront(c); $$ = new FparType($1, $4); }
-|   data-type '[' T_const ']' int-const_list    { Const* c = new Const($3); $5->putinfront(c); $$ = new FparType($1, $5); }
+|   data-type '[' ']' int-const_list            { $4->putinfront(0); $$ = new FparType($1, $4); }
+|   data-type '[' T_const ']' int-const_list    { $5->putinfront($3); $$ = new FparType($1, $5); }
 ;
 
 local-def: 
@@ -164,12 +164,12 @@ func-decl:
 ;
 
 var-def: 
-    "var" T_id id_list ':' type ';'     { Id* id = new Id($2, yylineno); $3->putinfront(id); $$ = new VarDef($3, $5); }
+    "var" T_id id_list ':' type ';'     { $3->putinfront($2); $$ = new VarDef($3, $5, yylineno); }
 ;
 
 stmt: 
     ';'                                 { $$ = new BlankStmt(); }
-|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3); }
+|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3, yylineno); }
 |   block                               { $$ = $1; }
 |   func-call ';'                       { $$ = $1; }
 |   "if" cond "then" stmt               { $$ = new If($2, $4, yylineno); }
