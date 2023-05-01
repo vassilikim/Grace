@@ -95,8 +95,8 @@ W [ \t\r]
 %%
 void illegal_char(char character) {
     if (character == '$')
-        printf("expected \"$$\" at the end of the comment -- line: %d", line);
-    else printf("illegal character: %c -- line: %d", character, line);
+        printf("expected \"$$\" at the end of the comment -- line: %d\n", line);
+    else printf("illegal character: %c -- line: %d\n", character, line);
     exit(1);
 }
 
