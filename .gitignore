@@ -18,4 +18,12 @@
 /interpreter/grace
 /interpreter/testing.sh
 
+/semantics/lexer.cpp
+/semantics/lexer.o
+/semantics/parser.cpp
+/semantics/parser.hpp
+/semantics/parser.o
+/semantics/parser.output
+/semantics/grace
+
 /.vscode

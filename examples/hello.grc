@@ -1,4 +1,5 @@
 fun hello () : nothing
 {
+   l <- 1 - '0';
    writeString("Hello world!\n");
 }
