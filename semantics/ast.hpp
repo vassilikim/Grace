@@ -36,13 +36,15 @@ inline std::ostream& operator<< (std::ostream &out, const AST &t) {
 
 class Expr: public AST {
 public:
-  void type_check(Datatype t, int code, int line, char* op = "") {
+  void type_check(Datatype t, int code, int line, char* op = const_cast<char*>("")) {
     sem();
     if (type != t) {
       showSemanticError(code, line, op);
     }
   }
-  virtual char* getName() {}
+  virtual char *getName() {
+    return const_cast<char *>("");
+  };
 protected:
   Datatype type;
 };
@@ -199,7 +201,7 @@ public:
     out << "Plus(" << *expr << ")";
   }
   virtual void sem() override {
-    expr->type_check(TYPE_int, 3, line, "+");
+    expr->type_check(TYPE_int, 3, line, const_cast<char*>("+"));
     type = TYPE_int;
   }
 private:
@@ -215,7 +217,7 @@ public:
     out << "Minus(" << *expr << ")";
   }
   virtual void sem() override {
-    expr->type_check(TYPE_int, 3, line, "-");
+    expr->type_check(TYPE_int, 3, line, const_cast<char*>("-"));
     type = TYPE_int;
   }
 private:
@@ -231,7 +233,7 @@ public:
     out << "Not(" << *expr << ")";
   }
   virtual void sem() override {
-    expr->type_check(TYPE_bool, 4, line, "not");
+    expr->type_check(TYPE_bool, 4, line, const_cast<char*>("not"));
     type = TYPE_bool;
   }
 private:
@@ -328,7 +330,7 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    expr->sem();
+    if (expr != nullptr) expr->sem();
   }
 private:
   Expr *expr;
@@ -508,8 +510,8 @@ public:
     }
   }
   std::vector<FunctionParameter> getFunctionParameter() {
+    std::vector<FunctionParameter> s;
     if (id_list != nullptr && fpar_type != nullptr) {
-      std::vector<FunctionParameter> s;
       Datatype t = fpar_type->getType();
       std::vector<int> v = fpar_type->getConstList();
       if (v.size() == 0) {
@@ -521,13 +523,13 @@ public:
           s.push_back(FunctionParameter(c, t, false, v));
         }
       }
-      return s;
     }
+    return s;
   }
 private:
+  int line;
   IdList *id_list;
   FparType *fpar_type;
-  int line;
   bool ref;
 };
 

@@ -143,6 +143,7 @@ public:
             if (e != nullptr) return e;
         }
         showSemanticError(11, line, c);
+        return new SymbolEntry();
         }
     void insertVar(char *c, Datatype t, int line) {
         scopes.back().insertVar(c, t, line); 
