@@ -129,6 +129,10 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "Id(" << str << ")";
   }
+  virtual void sem() override {
+    SymbolEntry * e = st.lookup(str, line);
+    type = e->getType();
+  }
   virtual char *getName() override {
     return str;
   }
@@ -143,6 +147,9 @@ public:
   ~String() { delete str; }
   virtual void printOn(std::ostream &out) const override {
     out << "String(" << str << ")";
+  }
+  virtual void sem() override {
+    type = TYPE_string;
   }
   virtual char *getName() override {
     return str;
