@@ -42,7 +42,7 @@ static void showSemanticError(int errorCode, int line, char* op) {
     std::cerr << "Unknown variable " ;
     printf("\033[1;35m%s\033[0m", op);
   }
-  printf("\' -- line: ");
+  printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
   exit(1);
 }
