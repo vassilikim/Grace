@@ -1,5 +1,4 @@
 fun hello (a, b : int[]) : nothing
 {
-   b[1] <- 10;
    writeString("Hello world!\n");
 }

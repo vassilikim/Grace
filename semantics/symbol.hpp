@@ -29,15 +29,18 @@ static void showSemanticError(int errorCode, int line, char* op) {
     printf("\033[1;35m%s\033[0m", op);
     printf("\' must apply on variables or constants of the same type.");
   } else if (errorCode == 7) {
-    printf("If-statements must start with a condition.\n");
+    printf("If-statements must start with a condition.");
   } else if (errorCode == 8) {
-    printf("While-statements must start with a condition.\n");
+    printf("While-statements must start with a condition.");
   } else if (errorCode == 9) {
     printf("Type mismatch in assignment.");
   } else if (errorCode == 10) {
     std::cerr << "Variable " ;
     printf("\033[1;35m%s\033[0m", op);
-    std::cerr << " is declared multiple times under the same scope.\n";
+    std::cerr << " is declared multiple times under the same scope.";
+  } else if (errorCode == 11) {
+    std::cerr << "Unknown variable " ;
+    printf("\033[1;35m%s\033[0m", op);
   }
   printf("\' -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
@@ -56,7 +59,18 @@ protected:
     Datatype type;
 };
 
-class VarEntry : public SymbolEntry {
+class FunctionParameter : public SymbolEntry {
+public:
+    FunctionParameter(char *n, Datatype t, bool isArray, std::vector<int> d = {}) : name(n), isArray(isArray), dimensions(d) { type = t; }
+
+private:
+    char *name;
+    bool isArray;
+    std::vector<int> dimensions;
+};
+
+class VarEntry : public SymbolEntry
+{
 public:
     VarEntry(Datatype t) { type = t; }
 };
@@ -72,11 +86,11 @@ private:
 
 class FunctionEntry : public SymbolEntry {
 public:
-    FunctionEntry(Datatype t, int n, std::vector<SymbolEntry> p) : num_parameters(n), parameters(p) { type = t; }
+    FunctionEntry(Datatype t, int n, std::vector<FunctionParameter> p) : num_parameters(n), parameters(p) { type = t; }
 
 private:
     int num_parameters;
-    std::vector<SymbolEntry> parameters;
+    std::vector<FunctionParameter> parameters;
 };
 
 class Scope {
@@ -99,7 +113,7 @@ public:
         }
         locals[c] = ArrayEntry(t, n.size(), n);
     }
-    void insertFunction(char *c, Datatype t, std::vector<SymbolEntry> n, int line) {
+    void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
         if (locals.find(c) != locals.end()) {
             showSemanticError(10, line, c);
         }
@@ -128,23 +142,18 @@ public:
             SymbolEntry * e = i->lookup(c);
             if (e != nullptr) return e;
         }
-        printf("\033[1;31merror:\n\t\033[0m");
-        std::cerr << "Unknown variable " ;
-        printf("\033[1;35m%s\033[0m", c);
-        printf(" -- line: ");
-        printf("\033[1;36m%d\n\033[0m", line);
-        exit(1);
-    }
+        showSemanticError(11, line, c);
+        }
     void insertVar(char *c, Datatype t, int line) {
         scopes.back().insertVar(c, t, line); 
     }
     void insertArray(char *c, Datatype t, std::vector<int> n, int line) { 
         scopes.back().insertArray(c, t, n, line); 
     }
-    void insertFunction(char *c, Datatype t, std::vector<SymbolEntry> n, int line) { 
+    void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line) { 
         scopes.back().insertFunction(c, t, n, line); 
     }
-    void insertFunctionToPreviousScope(char *c, Datatype t, std::vector<SymbolEntry> n, int line) {
+    void insertFunctionToPreviousScope(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
         if (scopes.size() > 1) {
             scopes[scopes.size() - 2].insertFunction(c, t, n, line);
         }

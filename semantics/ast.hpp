@@ -477,7 +477,7 @@ private:
 
 class FparDef: public Func {
 public:
-  FparDef(int l = -1, IdList *id = nullptr, FparType *f = nullptr): line(l), id_list(id), fpar_type(f) {}
+  FparDef(int l = -1, IdList *id = nullptr, FparType *f = nullptr, bool ref = false): line(l), id_list(id), fpar_type(f), ref(ref) {}
   ~FparDef() { delete id_list; delete fpar_type; }
   virtual void printOn(std::ostream &out) const override {
     out << "FparDef(";
@@ -500,18 +500,18 @@ public:
       }
     }
   }
-  std::vector<SymbolEntry> getSymbolEntry() {
+  std::vector<FunctionParameter> getFunctionParameter() {
     if (id_list != nullptr && fpar_type != nullptr) {
-      std::vector<SymbolEntry> s;
+      std::vector<FunctionParameter> s;
       Datatype t = fpar_type->getType();
       std::vector<int> v = fpar_type->getConstList();
       if (v.size() == 0) {
         for (char *c : id_list->getIdList()) {
-          s.push_back(VarEntry(t));
+          s.push_back(FunctionParameter(c, t, false));
         }
       } else {
         for (char *c : id_list->getIdList()) {
-          s.push_back(ArrayEntry(t, v.size(), v));
+          s.push_back(FunctionParameter(c, t, false, v));
         }
       }
       return s;
@@ -521,56 +521,8 @@ private:
   IdList *id_list;
   FparType *fpar_type;
   int line;
+  bool ref;
 };
-
-class RefFparDef: public FparDef {
-public:
-  RefFparDef(int l, IdList *id = nullptr, FparType *f = nullptr): line(l), id_list(id), fpar_type(f) {}
-  ~RefFparDef() { delete id_list; delete fpar_type; }
-  virtual void printOn(std::ostream &out) const override {
-    out << "RefFparDef(";
-    if (id_list != nullptr) out << *id_list;
-    if (fpar_type != nullptr) out << ", " << *fpar_type;
-    out << ")";
-  }
-  virtual void sem() override {
-    if (id_list != nullptr && fpar_type != nullptr) {
-      Datatype t = fpar_type->getType();
-      std::vector<int> v = fpar_type->getConstList();
-      if (v.size() == 0) {
-        for (char *c : id_list->getIdList()) {
-        st.insertVar(c, t, line);
-      }
-      } else {
-        for (char *c : id_list->getIdList()) {
-        st.insertArray(c, t, v, line);
-        }
-      }
-    }
-  }
-  std::vector<SymbolEntry> getSymbolEntry() {
-    if (id_list != nullptr && fpar_type != nullptr) {
-      std::vector<SymbolEntry> s;
-      Datatype t = fpar_type->getType();
-      std::vector<int> v = fpar_type->getConstList();
-      if (v.size() == 0) {
-        for (char *c : id_list->getIdList()) {
-          s.push_back(VarEntry(t));
-        }
-      } else {
-        for (char *c : id_list->getIdList()) {
-          s.push_back(ArrayEntry(t, v.size(), v));
-        }
-      }
-      return s;
-    }
-  }
-private:
-  IdList *id_list;
-  FparType *fpar_type;
-  int line;
-};
-
 
 class FparDefList: public Func {
 public:
@@ -591,14 +543,14 @@ public:
   virtual void sem() override {
     for(FparDef *fdef_elem : fdef_list) fdef_elem->sem();
   }
-  std::vector<SymbolEntry> getSymbolEntries() {
-    std::vector<SymbolEntry> s = {};
+  std::vector<FunctionParameter> getFunctionParameters() {
+    std::vector<FunctionParameter> s;
     for (FparDef *f : fdef_list) {
-      std::vector<SymbolEntry> a = f->getSymbolEntry();
-      s.reserve(s.size() + a.size());
-      s.insert(s.end(), a.begin(), a.end());
-    return s;
+      for (FunctionParameter e : f->getFunctionParameter()) {
+        s.push_back(e);
+      }
     }
+    return s;
   }
 private:
   std::vector<FparDef *> fdef_list;
@@ -613,7 +565,7 @@ public:
   }
   virtual void sem() override {
     st.addScopeNameAndType(id, rettype);
-    st.insertFunctionToPreviousScope(id, rettype, fpar->getSymbolEntries(), line);
+    st.insertFunctionToPreviousScope(id, rettype, fpar->getFunctionParameters(), line);
     fpar->sem(); 
   }
 private:
