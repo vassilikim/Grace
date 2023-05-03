@@ -11,15 +11,7 @@
 
 extern int yylineno;
 
-inline std::ostream& operator<<(std::ostream &out, Datatype t) {
-  switch (t) {
-    case TYPE_int: out << "int"; break;
-    case TYPE_bool: out << "bool"; break;
-    case TYPE_char: out << "char"; break;
-    case TYPE_nothing: out << "nothing"; break;
-  }
-  return out;
-}
+
 
 class AST {
 public:
@@ -38,7 +30,7 @@ public:
   void type_check(Datatype t, int code, int line, char* op = const_cast<char*>("")) {
     sem();
     if (type != t) {
-      showSemanticError(code, line, op);
+      showSemanticError(code, line, op, t, type);
     }
   }
   Datatype type_check_return(std::vector<Datatype> t, int code, int line, char* op = const_cast<char*>("")) {
@@ -366,7 +358,7 @@ public:
       expr->sem();
       expr->type_check(t, 16, line, st.getCurrentScopeName());
     } else if (t != TYPE_nothing) {
-      showSemanticError(17, line, st.getCurrentScopeName());
+      showSemanticError(17, line, st.getCurrentScopeName(), t);
     }
     st.setCurrentScopeReturned();
   }
@@ -626,9 +618,13 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "Header(" << id << ", " << *fpar << ", " << rettype << ")";
   }
-  virtual void sem() override {
+  void headerSem(bool isDefined) {
     st.addScopeNameAndType(id, rettype);
-    st.insertFunctionToPreviousScope(id, rettype, fpar->getFunctionParameters(), line);
+    if (isDefined == true) {
+      st.insertFunctionToPreviousScope(id, rettype, fpar->getFunctionParameters(), line);
+    } else {
+      st.insertFunction(id, rettype, fpar->getFunctionParameters(), line, false);
+    }
     fpar->sem(); 
   }
 private:
@@ -669,9 +665,10 @@ public:
   }
   virtual void sem() override {
     st.openScope();
-    head->sem();
+    head->headerSem(true);
     local->sem();
     block->sem();
+    st.setCurrentFunctionDefined();
     st.closeScope(line);
   }
 private:
@@ -690,7 +687,7 @@ public:
     out << "FuncDecl(" << *header << ")";
   }
   virtual void sem() override {
-    header->sem();
+    header->headerSem(false);
   }
 private:
   Header *header;

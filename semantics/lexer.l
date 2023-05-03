@@ -87,6 +87,7 @@ void illegal_char(char character) {
         printf("\' -- line: ");
     }
     printf("\033[1;36m%d\n\033[0m", yylineno);
+    printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
     exit(1);
 }
 
