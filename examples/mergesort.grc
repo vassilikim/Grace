@@ -8,7 +8,7 @@ fun main() : nothing
     fun mergeSort(ref array: int[]; begin, end : int) : nothing
         var mid : int;
 
-        $$fun merge(ref array: int[]; first, mid, last : int): nothing
+        fun merge(ref array: int[]; first, mid, last : int): nothing
             var b: int[10];
             var i, j, k : int;
         {
@@ -49,11 +49,11 @@ fun main() : nothing
                 i<-i+1;
             }
 
-        }$$
+        }
 
     {
-        $$if (begin >= end) then
-            return; $$ $ Returns recursively
+        if (begin >= end) then
+            return; $ Returns recursively
     
         mid <- begin + (end - begin) div 2;
         mergeSort(array, begin, mid);

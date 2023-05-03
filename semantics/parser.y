@@ -171,7 +171,7 @@ stmt:
     ';'                                 { $$ = new BlankStmt(); }
 |   l-value "<-" expr ';'               { $$ = new Assignment($1, $3, yylineno); }
 |   block                               { $$ = $1; }
-|   func-call ';'                       { $$ = $1; }
+|   func-call ';'                       { $1->makeStmt(); $$ = $1; }
 |   "if" cond "then" stmt               { $$ = new If($2, $4, yylineno); }
 |   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, yylineno, $6); }
 |   "while" cond "do" stmt              { $$ = new While($2, $4, yylineno); }

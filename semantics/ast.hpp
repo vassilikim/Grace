@@ -17,7 +17,6 @@ inline std::ostream& operator<<(std::ostream &out, Datatype t) {
     case TYPE_bool: out << "bool"; break;
     case TYPE_char: out << "char"; break;
     case TYPE_nothing: out << "nothing"; break;
-    case TYPE_string: out << "string"; break;
   }
   return out;
 }
@@ -26,7 +25,7 @@ class AST {
 public:
   virtual void printOn(std::ostream &out) const = 0;
   virtual ~AST() {}
-  virtual void sem(){}
+  virtual void sem (){}
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
@@ -42,11 +41,25 @@ public:
       showSemanticError(code, line, op);
     }
   }
+  Datatype type_check_return(std::vector<Datatype> t, int code, int line, char* op = const_cast<char*>("")) {
+    sem();
+    bool isValid = false;
+      for(Datatype tt : t) {
+          if (tt == type) {
+              isValid = true;
+              break;
+          }
+      }
+    if (isValid == false) {
+      showSemanticError(code, line, op);
+    }
+    return type;
+  }
   virtual char *getName() {
     return const_cast<char *>("");
-  };
+  }
   virtual SymbolEntry * getSymbolEntry() {
-    return new SymbolEntry();
+    return new VarEntry();
   }
 protected:
   Datatype type;
@@ -135,14 +148,14 @@ public:
     out << "Id(" << str << ")";
   }
   virtual void sem() override {
-    SymbolEntry * e = st.lookup(str, line, const_cast<char*>("var"));
+    SymbolEntry * e = st.lookup(str, line, {TYPE_var, TYPE_array});
     type = e->getDatatype();
   }
   virtual char *getName() override {
     return str;
   }
-  virtual SymbolEntry *getSymbolEntry() {
-    return st.lookup(str, line, const_cast<char*>("var"));
+  virtual SymbolEntry *getSymbolEntry() override {
+    return st.lookup(str, line, {TYPE_var, TYPE_array});
   }
 private:
   char *str;
@@ -157,7 +170,7 @@ public:
     out << "String(" << str << ")";
   }
   virtual void sem() override {
-    type = TYPE_string;
+    type = TYPE_char;
   }
   virtual char *getName() override {
     return str;
@@ -175,6 +188,9 @@ public:
   virtual void sem() override {
     type = TYPE_char;
   }
+  virtual char *getName() override {
+    return constchar;
+  }
 private:
   char *constchar;
 };
@@ -187,13 +203,15 @@ public:
     out << "ArrayCall(" << *lvalue << ", " << *expr << ")";
   }
   virtual void sem() override {
+    lvalue->sem();
+    type = st.lookup(lvalue->getName(), line, {TYPE_array})->getDatatype();
     expr->type_check(TYPE_int, 2, line);
   }
   virtual char *getName() override {
     return lvalue->getName();
   }
-  virtual SymbolEntry *getSymbolEntry() {
-    return st.lookup(lvalue->getName(), line, const_cast<char*>("array"));
+  virtual SymbolEntry *getSymbolEntry() override {
+    return st.lookup(lvalue->getName(), line, {TYPE_array});
   }
 private:
     Expr *lvalue;
@@ -280,8 +298,7 @@ public:
       left->type_check(TYPE_bool, 4, line, op);
       right->type_check(TYPE_bool, 4, line, op);
     } else {
-      left->type_check(TYPE_int, 6, line, op);
-      right->type_check(TYPE_int, 6, line, op);
+      right->type_check(left->type_check_return({TYPE_int, TYPE_char}, 6, line, op), 6, line, op);
     }
     type = TYPE_bool;
   }
@@ -308,9 +325,15 @@ public:
     }
     out << ")";
   }
-  virtual void sem() override {
+  virtual void exprListSem(std::vector<Datatype> types, int l, char* f) {
+    if (expr_list.size() != types.size()) {
+      showSemanticError(14, l, f);
+    }
+    int i = 0;
     for (Expr *e : expr_list) {
       e->sem();
+      e->type_check(types[i], 15, l, e->getName());
+      ++i;
     }
   }
 private:
@@ -434,12 +457,26 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    SymbolEntry *e = st.lookup(id, line, const_cast<char *>("function"));
+    SymbolEntry *e = st.lookup(id, line, {TYPE_function});
+    if (expr_list != nullptr) {
+      expr_list->exprListSem(e->getParameterTypes(), line, id);
+    } 
+    else if (e->getParameterTypes().size() != 0) {
+      showSemanticError(14, line, id);
+    }
+    type = e->getDatatype();
+    if (isVoid == true && type != TYPE_nothing) {
+      showSemanticError(13, line, id);
+    }
+  }
+  void makeStmt() {
+    isVoid = true;
   }
 private:
   char *id;
   int line;
   ExprList *expr_list;
+  bool isVoid = false;
 };
 
 
@@ -509,11 +546,11 @@ public:
       std::vector<int> v = fpar_type->getConstList();
       if (v.size() == 0) {
         for (char *c : id_list->getIdList()) {
-        st.insertVar(c, t, line);
-      }
+          st.insertVar(c, t, line);
+        }
       } else {
         for (char *c : id_list->getIdList()) {
-        st.insertArray(c, t, v, line);
+          st.insertArray(c, t, v, line);
         }
       }
     }
