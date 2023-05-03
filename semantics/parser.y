@@ -100,7 +100,7 @@ program:
 ;
 
 func-def: 
-    header local-def_list block         { $$ = new FuncDef($1, $2, $3); }
+    header local-def_list block         { $$ = new FuncDef($1, $2, $3, yylineno); }
 ;
 
 local-def_list: 
@@ -175,8 +175,8 @@ stmt:
 |   "if" cond "then" stmt               { $$ = new If($2, $4, yylineno); }
 |   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, yylineno, $6); }
 |   "while" cond "do" stmt              { $$ = new While($2, $4, yylineno); }
-|   "return" ';'                        { $$ = new Return(); }
-|   "return" expr ';'                   { $$ = new Return($2); }
+|   "return" ';'                        { $$ = new Return(yylineno); }
+|   "return" expr ';'                   { $$ = new Return(yylineno, $2); }
 ;
 
 block:

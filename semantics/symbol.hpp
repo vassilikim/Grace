@@ -57,7 +57,15 @@ static void showSemanticError(int errorCode, int line, char* op) {
     std::cerr << "Parameter " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " does not match the type of the argument.";
-  } 
+  } else if (errorCode == 16) {
+    std::cerr << "Type mismatch in return statement of function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << ".";
+  } else if (errorCode == 17) {
+    std::cerr << "Non void function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot return void.";
+  }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
   exit(1);
@@ -172,10 +180,23 @@ public:
         name = n;
         type = t;
     }
+    Datatype getScopeDatatype() {
+        return type; 
+    }
+    char* getScopeName() {
+        return const_cast<char*>(name); 
+    }
+    void setReturned() {
+        isReturned = true;
+    }
+    bool checkReturned() {
+        return isReturned;
+    }
 private:
     std::map<std::string, SymbolEntry *> locals;
     char *name;
     Datatype type;
+    bool isReturned = false;
 };
 
 class SymbolTable {
@@ -183,7 +204,10 @@ public:
     void openScope() {
         scopes.push_back(Scope());
     }
-    void closeScope() { 
+    void closeScope(int line) { 
+        if (scopes.back().checkReturned() == false && scopes.back().getScopeDatatype() != TYPE_nothing) {
+            showSemanticError(17, line, scopes.back().getScopeName());
+        }
         scopes.pop_back(); 
     };
     SymbolEntry * lookup(char *c, int line, std::vector<IdType> type) {
@@ -239,6 +263,15 @@ public:
     }
     void addScopeNameAndType(char* c, Datatype t) {
         scopes.back().addNameAndType(c, t); 
+    }
+    Datatype getCurrentScopeDatatype() {
+        return scopes.back().getScopeDatatype(); 
+    }
+    char* getCurrentScopeName() {
+        return scopes.back().getScopeName(); 
+    }
+    void setCurrentScopeReturned() {
+        scopes.back().setReturned();
     }
 private:
     std::vector<Scope> scopes;

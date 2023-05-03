@@ -353,7 +353,7 @@ public:
 
 class Return: public Stmt {
 public:
-  Return(Expr *e = nullptr): expr(e) {}
+  Return(int l, Expr *e = nullptr): line(l), expr(e) {}
   ~Return() { delete expr; }
   virtual void printOn(std::ostream &out) const override {
     out << "Return(";
@@ -361,9 +361,17 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    if (expr != nullptr) expr->sem();
+    Datatype t = st.getCurrentScopeDatatype();
+    if (expr != nullptr) {
+      expr->sem();
+      expr->type_check(t, 16, line, st.getCurrentScopeName());
+    } else if (t != TYPE_nothing) {
+      showSemanticError(17, line, st.getCurrentScopeName());
+    }
+    st.setCurrentScopeReturned();
   }
 private:
+  int line;
   Expr *expr;
 };
 
@@ -377,8 +385,8 @@ public:
   virtual void sem() override {
     expr1->sem();
     expr2->sem();
-    SymbolEntry *e = expr1->getSymbolEntry();
-    expr2->type_check(e->getDatatype(), 9, line);
+    SymbolEntry *e1 = expr1->getSymbolEntry();
+    expr2->type_check(e1->getDatatype(), 9, line);
   }
 private:
   Expr *expr1;
@@ -654,7 +662,7 @@ private:
 
 class FuncDef: public Func {
 public:
-  FuncDef(Header *h, LocalDefList *l, Block *b): head(h), local(l), block(b) {}
+  FuncDef(Header *h, LocalDefList *l, Block *b, int li): head(h), local(l), block(b), line(li) {}
   ~FuncDef() { delete head; delete local; delete block; }
   virtual void printOn(std::ostream &out) const override {
     out << "FuncDef(" << *head << ", " << *local << ", " << *block << ")";
@@ -664,12 +672,13 @@ public:
     head->sem();
     local->sem();
     block->sem();
-    st.closeScope();
+    st.closeScope(line);
   }
 private:
   Header *head;
   LocalDefList *local;
   Block *block;
+  int line;
 };
 
 
