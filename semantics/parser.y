@@ -2,7 +2,15 @@
 #include <cstring>
 #include "lexer.hpp"
 #include "ast.hpp"
+
+
+extern int yylineno;
+extern char *yytext;
+
+
+SymbolTable st;
 %}
+%locations
 
 %token T_and    "and"  
 %token T_char   "char"
@@ -48,10 +56,10 @@
   FparDefList *fpardeflist;
   FparDef *fpardef;
   IdList *idlist;
-  char *datatype;
+  Datatype datatype;
   Type *type;
   ConstList *constlist;
-  char *rettype;
+  Datatype rettype;
   FparType *fpartype;
   Func *func;
   Stmt *stmt;
@@ -88,11 +96,14 @@
 %%
 
 program: 
-    func-def                            { std::cout << "AST: " << *$1 << std::endl; delete $1; }
+    func-def                            {   FuncDef *parsingTree = $1;
+                                            //std::cout << "AST: " << *$1 << std::endl; 
+                                            printf("\033[1;32m- Successful parsing.\n\033[0m");
+                                            parsingTree->sem(); delete $1; }
 ;
 
 func-def: 
-    header local-def_list block         { $$ = new FuncDef($1, $2, $3); }
+    header local-def_list block         { $$ = new FuncDef($1, $2, $3, yylineno); }
 ;
 
 local-def_list: 
@@ -101,8 +112,8 @@ local-def_list:
 ;
 
 header: 
-    "fun" T_id '(' ')' ':' ret-type                 { $$ = new Header($2, new FparDefList(), $6); }
-|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   { $$ = new Header($2, $4, $7); }
+    "fun" T_id '(' ')' ':' ret-type                 { $$ = new Header($2, new FparDefList(), $6, yylineno); }
+|   "fun" T_id '(' fpar-def_list ')' ':' ret-type   { $$ = new Header($2, $4, $7, yylineno); }
 ;
 
 fpar-def_list: 
@@ -111,8 +122,8 @@ fpar-def_list:
 ;
 
 fpar-def:
-    T_id id_list ':' fpar-type          { $2->putinfront($1); $$ = new FparDef($2, $4); }
-|   "ref" T_id id_list ':' fpar-type    { $3->putinfront($2); $$ = new RefFparDef($3, $5); }
+    T_id id_list ':' fpar-type          { $2->putinfront($1); $$ = new FparDef(yylineno, $2, $4); }
+|   "ref" T_id id_list ':' fpar-type    { $3->putinfront($2); $$ = new FparDef(yylineno, $3, $5, true); }
 ;
 
 id_list: 
@@ -121,8 +132,8 @@ id_list:
 ;
 
 data-type: 
-    "int"                               { char* c = new char[4]; strcpy(c, "int"); $$ = c; }                
-|   "char"                              { char* s = new char[5]; strcpy(s, "char"); $$ = s; }
+    "int"                               { $$ = TYPE_int; }                
+|   "char"                              { $$ = TYPE_char; }
 ;
 
 type:
@@ -136,7 +147,7 @@ int-const_list:
 
 ret-type: 
     data-type                           { $$ = $1; }
-|   "nothing"                           { char* n= new char[8]; strcpy(n, "nothing"); $$ = n; }
+|   "nothing"                           { $$ = TYPE_nothing; }
 ;
 
 fpar-type: 
@@ -156,19 +167,19 @@ func-decl:
 ;
 
 var-def: 
-    "var" T_id id_list ':' type ';'     { $3->putinfront($2); $$ = new VarDef($3, $5); }
+    "var" T_id id_list ':' type ';'     { $3->putinfront($2); $$ = new VarDef($3, $5, yylineno); }
 ;
 
 stmt: 
     ';'                                 { $$ = new BlankStmt(); }
-|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3); }
+|   l-value "<-" expr ';'               { $$ = new Assignment($1, $3, yylineno); }
 |   block                               { $$ = $1; }
-|   func-call ';'                       { $$ = $1; }
-|   "if" cond "then" stmt               { $$ = new If($2, $4); }
-|   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, $6); }
-|   "while" cond "do" stmt              { $$ = new While($2, $4); }
-|   "return" ';'                        { $$ = new Return(); }
-|   "return" expr ';'                   { $$ = new Return($2); }
+|   func-call ';'                       { $1->makeStmt(); $$ = $1; }
+|   "if" cond "then" stmt               { $$ = new If($2, $4, yylineno); }
+|   "if" cond "then" stmt "else" stmt   { $$ = new If($2, $4, yylineno, $6); }
+|   "while" cond "do" stmt              { $$ = new While($2, $4, yylineno); }
+|   "return" ';'                        { $$ = new Return(yylineno); }
+|   "return" expr ';'                   { $$ = new Return(yylineno, $2); }
 ;
 
 block:
@@ -181,8 +192,8 @@ stmt_list:
 ;
 
 func-call: 
-    T_id '(' ')'                        { $$ = new FuncCall($1); }
-|   T_id '(' expr expr_list ')'         { $4->putinfront($3); $$ = new FuncCall($1, $4); }
+    T_id '(' ')'                        { $$ = new FuncCall($1, yylineno); }
+|   T_id '(' expr expr_list ')'         { $4->putinfront($3); $$ = new FuncCall($1, yylineno, $4); }
 ;
 
 expr_list: 
@@ -191,9 +202,9 @@ expr_list:
 ;
 
 l-value: 
-    T_id                                { $$ = new Id($1); }
+    T_id                                { $$ = new Id($1, yylineno); }
 |   T_string                            { $$ = new String($1); }
-|   l-value '[' expr ']'                { $$ = new Array($1, $3); }
+|   l-value '[' expr ']'                { $$ = new ArrayCall($1, $3, yylineno); }
 ;
 
 expr: 
@@ -202,38 +213,46 @@ expr:
 |   l-value                             { $$ = $1; }
 |   '(' expr ')'                        { $$ = $2; }
 |   func-call                           { $$ = $1; }
-|   '+' expr %prec SIGN                 { $$ = new Plus($2); }
-|   '-' expr %prec SIGN                 { $$ = new Minus($2); }
-|   expr '+' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr '-' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr '*' expr                       { $$ = new BinOp($1, $2, $3); }
-|   expr "div" expr                     { $$ = new BinOp($1, $2, $3); }
-|   expr "mod" expr                     { $$ = new BinOp($1, $2, $3); }
+|   '+' expr %prec SIGN                 { $$ = new Plus($2, yylineno); }
+|   '-' expr %prec SIGN                 { $$ = new Minus($2, yylineno); }
+|   expr '+' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr '-' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr '*' expr                       { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr "div" expr                     { $$ = new BinOp($1, $2, $3, yylineno); }
+|   expr "mod" expr                     { $$ = new BinOp($1, $2, $3, yylineno); }
 ;
 
 cond: 
     '(' cond ')'                        { $$ = $2; }
-|   "not" cond                          { $$ = new Not($2); }
-|   cond "and" cond                     { $$ = new CondOp($1, $2, $3); }
-|   cond "or" cond                      { $$ = new CondOp($1, $2, $3); }
-|   expr '=' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '#' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '<' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr '>' expr                       { $$ = new CondOp($1, $2, $3); }
-|   expr "<=" expr                      { $$ = new CondOp($1, $2, $3); }
-|   expr ">=" expr                      { $$ = new CondOp($1, $2, $3); }
+|   "not" cond                          { $$ = new Not($2, yylineno); }
+|   cond "and" cond                     { $$ = new CondOp($1, $2, $3, yylineno); }
+|   cond "or" cond                      { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '=' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '#' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '<' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr '>' expr                       { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr "<=" expr                      { $$ = new CondOp($1, $2, $3, yylineno); }
+|   expr ">=" expr                      { $$ = new CondOp($1, $2, $3, yylineno); }
 ;
 
 
 %%
 
 void yyerror(const char *msg){
-  fprintf(stderr, "Syntax Error: %s\n", msg);
+
+
+
+  printf("\033[1;31m%s:\n\t\033[0m", msg);
+  printf("Cannot parse token: ");
+  printf("\033[1;35m%s\033[0m", yytext);
+  printf(" -- line: ");
+  printf("\033[1;36m%d\n\033[0m", yylineno);
+  printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
   exit(42);
 }
 
 int main() {
-  int result = yyparse();
-  if (result == 0) printf("Successful parsing\n");
-  return result;
+    int result = yyparse();
+    if (result == 0) printf("\033[1;32m- Semantics checked.\n\033[0m");
+    return result;
 }

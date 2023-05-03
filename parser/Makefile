@@ -11,7 +11,7 @@ lexer.cpp: lexer.l
 lexer.o: lexer.cpp lexer.hpp parser.hpp
 
 parser.hpp parser.cpp: parser.y
-	bison -dv -o parser.cpp parser.y
+	bison -v -dv -o parser.cpp parser.y
 
 parser.o: parser.cpp lexer.hpp
 
@@ -22,4 +22,4 @@ clean:
 	$(RM) lexer.cpp parser.cpp parser.hpp parser.output *.o
 
 distclean: clean
-	$(RM) grace	
+	$(RM) grace

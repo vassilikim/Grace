@@ -1,5 +1,22 @@
-fun main(x:int): nothing{
-    while x>42 do{
-        x<-x-1;
+fun main(): nothing
+    var x : int[4][6];
+    var bar: char[1000][1][1];
+    fun y(x:int):char 
+    
+    {return 'c';}
+    fun z(x:int; y:char):int
+    var foo: int;
+    {
+        foo<-42;
+        return 42;
     }
+
+
+    fun void(x:int):int{;;}
+
+{
+    x<-z(42, y(42)) div 5;
+    x<-readInteger();
+    $bar<-void(x);
+
 }
