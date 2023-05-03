@@ -45,6 +45,9 @@ public:
   virtual char *getName() {
     return const_cast<char *>("");
   };
+  virtual SymbolEntry * getSymbolEntry() {
+    return new SymbolEntry();
+  }
 protected:
   Datatype type;
 };
@@ -132,11 +135,14 @@ public:
     out << "Id(" << str << ")";
   }
   virtual void sem() override {
-    SymbolEntry * e = st.lookup(str, line);
-    type = e->getType();
+    SymbolEntry * e = st.lookup(str, line, const_cast<char*>("var"));
+    type = e->getDatatype();
   }
   virtual char *getName() override {
     return str;
+  }
+  virtual SymbolEntry *getSymbolEntry() {
+    return st.lookup(str, line, const_cast<char*>("var"));
   }
 private:
   char *str;
@@ -181,11 +187,13 @@ public:
     out << "ArrayCall(" << *lvalue << ", " << *expr << ")";
   }
   virtual void sem() override {
-    lvalue->sem();
     expr->type_check(TYPE_int, 2, line);
   }
   virtual char *getName() override {
     return lvalue->getName();
+  }
+  virtual SymbolEntry *getSymbolEntry() {
+    return st.lookup(lvalue->getName(), line, const_cast<char*>("array"));
   }
 private:
     Expr *lvalue;
@@ -346,8 +354,8 @@ public:
   virtual void sem() override {
     expr1->sem();
     expr2->sem();
-    SymbolEntry * e = st.lookup(expr1->getName(), line);
-    expr2->type_check(e->getType(), 9, line);
+    SymbolEntry *e = expr1->getSymbolEntry();
+    expr2->type_check(e->getDatatype(), 9, line);
   }
 private:
   Expr *expr1;
@@ -418,7 +426,7 @@ private:
 
 class FuncCall: public Expr, public Stmt {
 public:
-  FuncCall(char *id, ExprList *e = nullptr): id(id), expr_list(e) {}
+  FuncCall(char *id, int l, ExprList *e = nullptr): id(id), line(l), expr_list(e) {}
   ~FuncCall() { delete id; delete expr_list; }
   virtual void printOn(std::ostream &out) const override {
     out << "FuncCall(" << id;
@@ -426,10 +434,11 @@ public:
     out << ")";
   }
   virtual void sem() override {
-    if (expr_list != nullptr) expr_list->sem();
+    SymbolEntry *e = st.lookup(id, line, const_cast<char *>("function"));
   }
 private:
   char *id;
+  int line;
   ExprList *expr_list;
 };
 

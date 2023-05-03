@@ -52,17 +52,21 @@ enum Datatype { TYPE_int, TYPE_bool, TYPE_char, TYPE_string, TYPE_nothing };
 class SymbolEntry {
 public:
     SymbolEntry() {}
-    Datatype getType() {
-        return type;
+    Datatype getDatatype() {
+        return datatype;
     }
+    char *getType() {
+        return type;
+    };
+
 protected:
-    Datatype type;
+    Datatype datatype;
+    char *type;
 };
 
 class FunctionParameter : public SymbolEntry {
 public:
-    FunctionParameter(char *n, Datatype t, bool isArray, std::vector<int> d = {}) : name(n), isArray(isArray), dimensions(d) { type = t; }
-
+    FunctionParameter(char *n, Datatype t, bool isArray, std::vector<int> d = {}) : name(n), isArray(isArray), dimensions(d) { datatype = t; }
 private:
     char *name;
     bool isArray;
@@ -72,12 +76,18 @@ private:
 class VarEntry : public SymbolEntry
 {
 public:
-    VarEntry(Datatype t) { type = t; }
+    VarEntry(Datatype t) { 
+        datatype = t;
+        type = const_cast<char *>("var");
+    }
 };
 
 class ArrayEntry : public SymbolEntry {
 public:
-    ArrayEntry(Datatype t, int n, std::vector<int> d) : num_dimensions(n), dimensions(d) { type = t; }
+    ArrayEntry(Datatype t, int n, std::vector<int> d) : num_dimensions(n), dimensions(d) { 
+        datatype = t;
+        type = const_cast<char *>("array");
+    }
 
 private:
     int num_dimensions;
@@ -86,8 +96,10 @@ private:
 
 class FunctionEntry : public SymbolEntry {
 public:
-    FunctionEntry(Datatype t, int n, std::vector<FunctionParameter> p) : num_parameters(n), parameters(p) { type = t; }
-
+    FunctionEntry(Datatype t, int n, std::vector<FunctionParameter> p) : num_parameters(n), parameters(p) { 
+        datatype = t; 
+        type = const_cast<char *>("function");
+    }
 private:
     int num_parameters;
     std::vector<FunctionParameter> parameters;
@@ -102,19 +114,19 @@ public:
         return &locals[c];
     }
     void insertVar(char *c, Datatype t, int line) {
-        if (locals.find(c) != locals.end()) {
+        if (locals.find(c) != locals.end() && (locals[c].getType() == const_cast<char *>("var") || locals[c].getType() == const_cast<char *>("array"))) {
             showSemanticError(10, line, c);
         }
         locals[c] = VarEntry(t);
     }
     void insertArray(char *c, Datatype t, std::vector<int> n, int line) {
-        if (locals.find(c) != locals.end()) {
+        if (locals.find(c) != locals.end() && (locals[c].getType() == const_cast<char *>("var") || locals[c].getType() == const_cast<char *>("array"))) {
             showSemanticError(10, line, c);
         }
         locals[c] = ArrayEntry(t, n.size(), n);
     }
     void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
-        if (locals.find(c) != locals.end()) {
+        if ((locals.find(c) != locals.end()) && locals[c].getType() == const_cast<char *>("function")) {
             showSemanticError(10, line, c);
         }
         locals[c] = FunctionEntry(t, n.size(), n);
@@ -137,10 +149,14 @@ public:
     void closeScope() { 
         scopes.pop_back(); 
     };
-    SymbolEntry * lookup(char *c, int line) {
+    SymbolEntry * lookup(char *c, int line, char *type) {
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c);
-            if (e != nullptr) return e;
+            if (e != nullptr) {
+                if (e->getType() != type)
+                    break;
+                return e;
+            }
         }
         showSemanticError(11, line, c);
         return new SymbolEntry();
@@ -158,6 +174,8 @@ public:
         if (scopes.size() > 1) {
             scopes[scopes.size() - 2].insertFunction(c, t, n, line);
         }
+        scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_string, false)}, line); 
+        scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line); 
     }
     void addScopeNameAndType(char* c, Datatype t) {
         scopes.back().addNameAndType(c, t); 

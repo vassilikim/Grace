@@ -27,7 +27,7 @@ fun main () : nothing
       }
    } $ bsort
 
-   $$fun writeArray (ref msg : char[]; n : int; ref x : int[]) : nothing
+   fun writeArray (ref msg : char[]; n : int; ref x : int[]) : nothing
       var i : int;
    {
       writeString(msg);
@@ -38,7 +38,7 @@ fun main () : nothing
          i <- i+1;
       }
       writeString("\n");
-   }$$
+   }
    
    var seed, i : int;
    var x       : int[16];

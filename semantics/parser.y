@@ -189,8 +189,8 @@ stmt_list:
 ;
 
 func-call: 
-    T_id '(' ')'                        { $$ = new FuncCall($1); }
-|   T_id '(' expr expr_list ')'         { $4->putinfront($3); $$ = new FuncCall($1, $4); }
+    T_id '(' ')'                        { $$ = new FuncCall($1, yylineno); }
+|   T_id '(' expr expr_list ')'         { $4->putinfront($3); $$ = new FuncCall($1, yylineno, $4); }
 ;
 
 expr_list: 
