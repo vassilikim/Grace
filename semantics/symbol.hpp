@@ -88,6 +88,10 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Undefined function " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << ".";
+  } else if (errorCode == 19) {
+    std::cerr << "Function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " is declared in two scopes.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
@@ -273,11 +277,16 @@ public:
     void insertArray(char *c, Datatype t, std::vector<int> n, int line) { 
         scopes.back().insertArray(c, t, n, line); 
     }
-    void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line, bool isDefined) { 
+    void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line, bool isDefined) {
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
             if (e != nullptr && e->checkDefined() == false && isDefined == true) {
-                e->setDefined();
+                if (i->getScopeName() == getCurrentScopeName()) {
+                    e->setDefined();
+                    return;
+                } else {
+                    showSemanticError(19, line, c);
+                }
             } else if (e != nullptr && isDefined == false) {
                 showSemanticError(12, line, c);
             }
@@ -287,7 +296,14 @@ public:
     void insertFunctionToPreviousScope(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
-            if (e != nullptr && e->checkDefined() == true) {
+            if (e != nullptr && e->checkDefined() == false) {
+                if (scopes.size() > 1 && scopes[scopes.size()-2].getScopeName() != i->getScopeName()) {
+                    showSemanticError(19, line, c);
+                } else {
+                    e->setDefined();
+                    return;
+                }
+            } else if (e != nullptr && e->checkDefined() == true) {
                 showSemanticError(12, line, c);
             }
         }
