@@ -12,12 +12,33 @@
 extern int yylineno;
 
 
+//////////////////////////////////////////////////////
+///Functions that maps the variables in  the memory///
+/////////////////////////////////////////////////////
+
+static std::vector<std::string> VarMap;
+
+static void allocateVariable(std::string c){
+  VarMap.push_back(c);
+}
+
+static int findInVarMap(std::string c){
+  for(int i=0; i<int(VarMap.size()); i++){
+    if(VarMap[i]==c) return i;
+  }
+  return -1;
+}
+
+/////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+
 
 class AST {
 public:
   virtual void printOn(std::ostream &out) const = 0;
   virtual ~AST() {}
   virtual void sem (){}
+  virtual void compile(){}
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
@@ -74,6 +95,11 @@ public:
   virtual void sem() override {
     type = TYPE_int;
   }
+
+  virtual void compile() override{
+    std::cout<<"  pushl $"<<num<<std::endl;
+  }
+
 private:
   int num;
 };
@@ -149,6 +175,11 @@ public:
   virtual SymbolEntry *getSymbolEntry() override {
     return st.lookup(str, line, {TYPE_var, TYPE_array});
   }
+
+  virtual void compile() override{
+    std::cout<<"  pushl "<< 4*findInVarMap(str) <<"(%edi)\n";
+  }
+
 private:
   char *str;
   int line;
@@ -222,6 +253,11 @@ public:
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("+"));
     type = TYPE_int;
   }
+
+  virtual void compile() override{
+    expr->compile();
+  }
+
 private:
   Expr *expr;
   int line;
@@ -238,6 +274,14 @@ public:
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("-"));
     type = TYPE_int;
   }
+
+  virtual void compile() override{
+    expr->compile();
+    std::cout<<"  popl %eax\n"
+             <<"  negl %eax\n"
+             <<"  pushl %eax\n";
+  }
+
 private:
   Expr *expr;
   int line;
@@ -254,9 +298,32 @@ public:
     expr->type_check(TYPE_bool, 4, line, const_cast<char*>("not"));
     type = TYPE_bool;
   }
+
+  virtual void compile() override{
+    expr->compile();
+    static int NotCondcounter = 0;
+    NotCondcounter++;
+    numOfNotCond= NotCondcounter;
+    if(NotCondcounter<=0){
+      printf("\n- \033[1;31mOVERFLOW\033[0m of the NOT condion counter.\n");
+      printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+    exit(1);
+    }
+    std::cout<<"  popl %eax\n";
+    std::cout<<"  cmpl %eax $0\n";
+    std::cout<<"  je NotCondTrue_"<<numOfNotCond<<"\n";
+    std::cout<<"  pushl $0\n";
+    std::cout<<"  jmp NotCondEnd_"<<numOfNotCond<<"\n";
+    std::cout<<"\nNotCondTrue_"<<numOfNotCond<<":\n\n";
+    std::cout<<"  pushl $1\n";
+    std::cout<<"\nNotCondEnd_"<<numOfNotCond<<":\n\n";
+
+  }
+
 private:
   Expr *expr;
   int line;
+  int numOfNotCond; // uesd to know how may NotConditions we have seen to name the assembly label
 };
 
 class BinOp: public Expr {
@@ -271,6 +338,38 @@ public:
     right->type_check(TYPE_int, 5, line, op);
     type = TYPE_int;
   }
+
+  virtual void compile() override{
+    left->compile();
+    right->compile();
+    std::cout<<"  popl %ebx\n";
+    std::cout<<"  popl %eax\n";
+    switch (op[0]) {
+      case '+':
+        std::cout<<"  addl %ebx, %eax\n";
+        std::cout<<"  pushl %eax\n";
+        break;
+      case '-':
+        std::cout<<"  subl %ebx, %eax\n";
+        std::cout<<"  pushl %eax\n";
+        break;
+      case '*':
+        std::cout<<"  mull %ebx\n";
+        std::cout<<"  pushl %eax\n";
+        break;
+      case 'd':
+        std::cout<<"  cdq\n";
+        std::cout<<"  divl %ebx\n";
+        std::cout<<"  pushl %eax\n";
+        break;
+      case 'm':
+        std::cout<<("  cdq\n");
+        std::cout<<("  divl %ebx\n");
+        std::cout<<("  pushl %edx\n");
+        break;
+    }
+  }
+
 private:
   Expr *left;
   char *op;
@@ -294,11 +393,70 @@ public:
     }
     type = TYPE_bool;
   }
+
+  virtual void compile() override{
+    static int Condcounter = 0;
+    Condcounter++;
+    numOfCond=Condcounter;
+    if(Condcounter<=0){
+      printf("\n- \033[1;31mOVERFLOW\033[0m of the NOT condion counter.\n");
+      printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+    exit(1);
+    }
+    left->compile();
+    right->compile();
+    std::cout<<"  popl %ebx\n";
+    std::cout<<"  popl %eax\n";
+    if(op[0] == '='){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  je CondTrue_"<<numOfCond<<"\n";
+
+    }
+    else if(op[0] == '#'){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  jne CondTrue_"<<numOfCond<<"\n";
+    }
+    else if(op[0] == '<' && op[1] == '='){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  jle CondTrue_"<<numOfCond<<"\n";
+
+    }
+    else if(op[0] == '>' && op[1] == '='){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  jge CondTrue_"<<numOfCond<<"\n";
+
+    }
+    else if(op[0] == '<'){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  jl CondTrue_"<<numOfCond<<"\n";
+
+    }
+    else if(op[0] == '>'){
+        std::cout<<"  cmpl %eax %ebx\n";
+        std::cout<<"  jg CondTrue_"<<numOfCond<<"\n";
+
+    }
+    else if(op[0] == 'a'){
+        std::cout<<"  andl %eax %ebx\n";
+        std::cout<<"  jnz CondTrue_"<<numOfCond<<"\n";
+    }
+    else if(op[0] == 'o'){
+        std::cout<<"  orl %eax %ebx\n";
+        std::cout<<"  jnz CondTrue_"<<numOfCond<<"\n";
+    }
+    std::cout<<"  pushl $0\n";
+    std::cout<<"  jmp CondEnd_"<<numOfCond<<"\n";
+    std::cout<<"\nCondTrue_"<<numOfCond<<":\n\n";
+    std::cout<<"  pushl $1\n";
+    std::cout<<"\nCondEnd_"<<numOfCond<<":\n\n";
+  }
+
 private:
   Expr *left;
   char *op;
   Expr *right;
   int line;
+  int numOfCond; // uesd to know how may Conditions we have seen to name the assembly label
 };
 
 class ExprList: public Stmt {
@@ -374,12 +532,22 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "Assignment(" << *expr1 << ", " << *expr2 << ")";
   }
+  
   virtual void sem() override {
     expr1->sem();
     expr2->sem();
     SymbolEntry *e1 = expr1->getSymbolEntry();
     expr2->type_check(e1->getDatatype(), 9, line);
   }
+
+  virtual void compile() override{
+    expr2->compile();
+    std::cout<<"  popl %eax\n";
+    if(typeid(*expr1) == typeid(Id))
+      std::cout<<"  movl %eax, "<< 4*findInVarMap(expr1->getName()) <<"(%edi)\n";
+
+}
+
 private:
   Expr *expr1;
   Expr *expr2;
@@ -401,11 +569,34 @@ public:
     stmt1->sem();
     if (stmt2 != nullptr) stmt2->sem();
   }
+
+  virtual void compile() override{
+    static int Ifcounter = 0;
+    Ifcounter++;
+    numOfIf = Ifcounter;
+    if(Ifcounter<=0){
+      printf("\n- \033[1;31mOVERFLOW\033[0m of the IfElse counter.\n");
+      printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+    exit(1);
+    }
+    cond->compile();
+    std::cout<<"  popl %eax\n";
+    std::cout<<"  andl %eax %eax\n";
+    std::cout<<"  jz Else_"<<numOfIf<<"\n";
+    stmt1->compile();
+    std::cout<<"  jmp IfEnd_"<<numOfIf<<"\n";
+    std::cout<<"\nElse_"<<numOfIf<<":\n\n";
+    if(stmt2!=nullptr)
+      stmt2->compile();
+    std::cout<<"\nIfEnd_"<<numOfIf<<":\n";
+  }
+
 private:
   Expr *cond;
   Stmt *stmt1;
   Stmt *stmt2;
   int line;
+  int numOfIf; // uesd to know how may "if" we have seen to name the assembly label
 };
 
 class While: public Stmt {
@@ -419,10 +610,30 @@ public:
     expr->type_check(TYPE_bool, 8, line);
     stmt->sem();
   }
+
+  virtual void compile() override{
+    static int Whilecounter = 0;
+    Whilecounter++;
+    numOfWhile = Whilecounter;
+    if(Whilecounter<=0){
+      printf("\n- \033[1;31mOVERFLOW\033[0m of the While counter.\n");
+      printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+    exit(1);
+    }
+    expr->compile();
+    std::cout<<"  popl %eax\n";
+    std::cout<<"  andl %eax %eax\n";
+    std::cout<<"  jz WhileEnd_"<<numOfWhile<<"\n";
+    stmt->compile();
+    std::cout<<"\nWhileEnd_"<<numOfWhile<<":\n\n";
+
+  }
+
 private:
   Expr *expr;
   Stmt *stmt;
   int line;
+  int numOfWhile; // uesd to know how may "while" we have seen to name the assembly label
 };
 
 class Block: public Stmt {
@@ -440,9 +651,15 @@ public:
     }
     out << ")";
   }
+
   virtual void sem() override {
     for (Stmt *s: stmt_list) s->sem();
   }
+
+  virtual void compile() override {
+    for (Stmt *s: stmt_list) {s->compile(); std::cout<<"\n";}
+  }
+
 private:
   std::vector<Stmt *> stmt_list;
 };
@@ -652,6 +869,11 @@ public:
   virtual void sem() override {
     for(Func *ldef_elem : ldef_list) ldef_elem->sem();
   }
+
+  virtual void compile() override{
+    for(Func *ldef_elem : ldef_list) ldef_elem->compile();
+  }
+
 private:
   std::vector<Func *> ldef_list;
 };
@@ -671,6 +893,13 @@ public:
     st.setCurrentFunctionDefined();
     st.closeScope(line);
   }
+
+  virtual void compile() override{
+    local->compile();
+    block->compile();
+  }
+
+
 private:
   Header *head;
   LocalDefList *local;
@@ -705,19 +934,53 @@ public:
     std::vector<int> v = type->getConstList();
     if (v.size() == 0) {
       for (char *c : id_list->getIdList()) {
-      st.insertVar(c, t, line);
-    }
+        st.insertVar(c, t, line);
+      }
     } else {
       for (char *c : id_list->getIdList()) {
-      st.insertArray(c, t, v, line);
+        st.insertArray(c, t, v, line);
       }
     }
   }
+
+  virtual void compile() override{
+    for (char *c : id_list->getIdList()) {
+      allocateVariable(c);
+    }
+  }
+
+
 private:
   IdList *id_list;
   Type *type;
   int line;
 };
+
+
+inline void prologue() {
+  std::cout<<"  .text\n"
+           <<"  .global _start\n"
+           <<"\n"
+           <<"_start:\n"
+           <<"  movl $var, %edi\n\n";
+}
+
+inline void epilogue() {
+  std::cout<<"\n"
+           <<"  movl $0, %ebx\n"
+           <<"  movl $1, %eax\n"
+           <<"  int $0x80\n"
+           <<"\n"
+           <<"  .data\n"
+           <<"var:\n"
+           <<"  .rept "<< VarMap.size()<<"\n"
+           <<"  .long 0\n"
+           <<"  .endr\n"
+           <<"NL:\n"
+           <<"  .asciz \"\\n\"\n";
+}
+
+
 
 
 #endif

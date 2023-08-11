@@ -1,22 +1,8 @@
 fun main(): nothing
-    var x : int[4][6];
-    var bar: char[1000][1][1];
-    fun y(x:int):char 
-    
-    {return 'c';}
-    fun z(x:int; y:char):int
-    var foo: int;
-    {
-        foo<-42;
-        return 42;
-    }
-
-
-    fun void(x:int):int{;;}
+    var x, x1, x2, x3:int;
+    var c: int[7];
 
 {
-    x<-z(42, y(42)) div 5;
-    x<-readInteger();
-    $bar<-void(x);
-
+    if(x>x2) then x1<-42;  else x3<-0 div 4;
+    c[8][0]<-0;
 }

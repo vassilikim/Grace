@@ -1,0 +1,9 @@
+fun main(): nothing
+    var x:int;
+
+    fun boo():nothing;
+    $fun foo():nothing{boo();}
+
+{
+    $ return x;
+}

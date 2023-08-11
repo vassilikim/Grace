@@ -1,0 +1,4 @@
+fun hello (a, b : int[]) : nothing
+{
+   writeString("Hello world!\n");
+}

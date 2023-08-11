@@ -2,7 +2,8 @@ $this is a progam that just compiles
 $$ hope it wokrs$$
 
 fun main( a: int; b, c:char[8][3][9] ): nothing
-    var Vass, Johb : char;
+    var Vass : char;
+    var John : int;
 {
     Vass<-'\x00';
     if John = 42 then print(x);
