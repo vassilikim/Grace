@@ -619,8 +619,8 @@ public:
     out << "Header(" << id << ", " << *fpar << ", " << rettype << ")";
   }
   void headerSem(bool isDefined) {
-    st.addScopeNameAndType(id, rettype);
     if (isDefined == true) {
+      st.addScopeNameAndType(id, rettype);
       st.insertFunctionToPreviousScope(id, rettype, fpar->getFunctionParameters(), line);
     } else {
       st.insertFunction(id, rettype, fpar->getFunctionParameters(), line, false);
