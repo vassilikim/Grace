@@ -92,6 +92,18 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Function " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " is declared in two scopes.";
+  } else if (errorCode == 20) {
+    std::cerr << "Function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " is declared but not defined.";
+  } else if (errorCode == 21) {
+    std::cerr << "Function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " is already defined with expected datatype \033[1;35m"<<expected<<"\033[0m.";
+  } else if (errorCode == 22) {
+    std::cerr << "Function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " is already defined with different parameters";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
@@ -111,6 +123,7 @@ public:
         return type;
     };
     virtual std::vector<Datatype> getParameterTypes() = 0;
+    virtual std::vector<char *> getParameterNames() = 0;
     virtual void setDefined() = 0;
     virtual bool checkDefined() = 0;
 
@@ -125,9 +138,15 @@ public:
     virtual std::vector<Datatype> getParameterTypes() override {
         return {};
     };
+    virtual std::vector<char *> getParameterNames() override {
+        return {};
+    };
     virtual void setDefined() override {}
     virtual bool checkDefined() override {
         return true;
+    }
+    char * getName() {
+        return name;
     }
 private:
     char *name;
@@ -146,6 +165,9 @@ public:
     virtual std::vector<Datatype> getParameterTypes() override {
         return {};
     };
+    virtual std::vector<char *> getParameterNames() override {
+        return {};
+    };
     virtual void setDefined() override {}
     virtual bool checkDefined() override {
         return true;
@@ -159,6 +181,9 @@ public:
         type = TYPE_array;
     }
     virtual std::vector<Datatype> getParameterTypes() override {
+        return {};
+    };
+    virtual std::vector<char *> getParameterNames() override {
         return {};
     };
     virtual void setDefined() override {}
@@ -185,6 +210,14 @@ public:
         }
         return v;
     }
+    virtual std::vector<char *> getParameterNames() override {
+        std::vector<char *> v = {};
+        for (int i = 0; i < num_parameters; ++i)
+        {
+            v.push_back(parameters[i].getName());
+        }
+        return v;
+    };
     virtual void setDefined() override {
         isDefined = true;
     }
@@ -239,6 +272,13 @@ public:
     bool checkReturned() {
         return isReturned;
     }
+    void allFunctionsDefined(int line) {
+        for (const auto& f : functions) {
+            if (!f.second->checkDefined()) {
+                return showSemanticError(20, line, strdup(f.first.c_str()));
+            }
+        }
+    }
 private:
     std::map<std::string, SymbolEntry *> locals;
     std::map<std::string, FunctionEntry *> functions;
@@ -256,6 +296,7 @@ public:
         if (scopes.back().checkReturned() == false && scopes.back().getScopeDatatype() != TYPE_nothing) {
             showSemanticError(17, line, scopes.back().getScopeName(), scopes.back().getScopeDatatype());
         }
+        scopes.back().allFunctionsDefined(line);
         scopes.pop_back(); 
     };
     SymbolEntry * lookup(char *c, int line, std::vector<IdType> type) {
@@ -280,6 +321,17 @@ public:
     void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line, bool isDefined) {
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
+            if (e != nullptr && e->getDatatype() != t) {
+                showSemanticError(21, line, c, e->getDatatype());
+            } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
+                showSemanticError(22, line, c);
+            } else if (e != nullptr) {
+                for (int i = 0; i < n.size(); i++) {
+                    if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
+                        showSemanticError(22, line, c);
+                    }
+                }
+            }
             if (e != nullptr && e->checkDefined() == false && isDefined == true) {
                 if (i->getScopeName() == getCurrentScopeName()) {
                     e->setDefined();
@@ -296,6 +348,17 @@ public:
     void insertFunctionToPreviousScope(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
+            if (e != nullptr && e->getDatatype() != t) {
+                showSemanticError(21, line, c, e->getDatatype());
+            } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
+                showSemanticError(22, line, c);
+            } else if (e != nullptr) {
+                for (int i = 0; i < n.size(); i++) {
+                    if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
+                        showSemanticError(22, line, c);
+                    }
+                }
+            }
             if (e != nullptr && e->checkDefined() == false) {
                 if (scopes.size() > 1 && scopes[scopes.size()-2].getScopeName() != i->getScopeName()) {
                     showSemanticError(19, line, c);

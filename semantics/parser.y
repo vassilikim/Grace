@@ -97,7 +97,7 @@ SymbolTable st;
 
 program: 
     func-def                            {   FuncDef *parsingTree = $1;
-                                            //std::cout << "AST: " << *$1 << std::endl; 
+                                            std::cout << "AST: " << *$1 << std::endl; 
                                             printf("\033[1;32m- Successful parsing.\n\033[0m");
                                             parsingTree->sem(); delete $1; }
 ;
