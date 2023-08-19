@@ -622,10 +622,10 @@ public:
     if (isDefined == true) {
       st.addScopeNameAndType(id, rettype);
       st.insertFunctionToPreviousScope(id, rettype, fpar->getFunctionParameters(), line);
+      fpar->sem(); 
     } else {
       st.insertFunction(id, rettype, fpar->getFunctionParameters(), line, false);
     }
-    fpar->sem(); 
   }
 private:
   char *id;
