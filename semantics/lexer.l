@@ -45,9 +45,9 @@ W [ \t\r]
 {L}({L}|{D}|_)* {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_id;}
 {D}+            {yylval.num = atoi(yytext); return T_const;}
 
-(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x{D}{D}\') {yylval.constchar = new char[yyleng + 1]; strcpy(yylval.constchar, yytext); return T_constchar;}
+(\'[^\\\'\"]\')|(\'(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")\')|(\'\\x({D}|[a-f])({D}|[a-f])\') {yylval.constchar = new char[yyleng + 1]; strcpy(yylval.constchar, yytext); return T_constchar;}
 
-\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x{D}{D}))*\" {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_string;}
+\"(([^\\\'\"\n])|(\\n|\\t|\\r|\\0|\\\\|\\\'|\\\")|(\\x({D}|[a-f])({D}|[a-f])))*\" {yylval.str = new char[yyleng + 1]; strcpy(yylval.str, yytext); return T_string;}
 
 [\+\-\*]                {yylval.binop = new char[yyleng + 1]; strcpy(yylval.binop, yytext); return yytext[0];}
 [\=\#\>\<]              {yylval.condop = new char[yyleng + 1]; strcpy(yylval.condop, yytext); return yytext[0];}
@@ -87,7 +87,7 @@ void illegal_char(char character) {
         printf("\' -- line: ");
     }
     printf("\033[1;36m%d\n\033[0m", yylineno);
-    printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+    printf("- Compilation \033[1;31mFAILED\033[0m.\n");
     exit(1);
 }
 

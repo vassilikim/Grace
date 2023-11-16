@@ -9,15 +9,129 @@
 
 #include "symbol.hpp"
 
+
 extern int yylineno;
 
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Verifier.h"
+#include <llvm/Support/raw_ostream.h>
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
+/* 
+#include "llvm/ADT/APInt.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+*/
+
+using namespace llvm;
+
+// Global LLVM variables related to the LLVM suite.
+static LLVMContext TheContext;
+static std::unique_ptr<Module> TheModule;
+static std::map<std::string, AllocaInst*> NamedValues;
+static IRBuilder<> builder(TheContext);
+static Function* mainFunc;
+
+static Function *writeInteger;
+static Function *writeChar;
+static Function *writeString;
+
+// Useful LLVM types.
+//static Type *i8;
+//static Type *i32;
+static Type *i64;
+
+/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
+/// the function.  This is used for mutable variables etc.
+static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, const std::string &VarName) {
+  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+  return TmpB.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, VarName);
+}
+
+/* static AllocaInst *CreateEntryBlockAllocaChar(Function *TheFunction, const std::string &VarName) {
+  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+  return TmpB.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, VarName);
+} */
 
 
 class AST {
 public:
   virtual void printOn(std::ostream &out) const = 0;
   virtual ~AST() {}
-  virtual void sem (){}
+  virtual void sem(){}
+  virtual Value *compile(){return 0;}// = 0;
+
+  void llvm_compile_and_dump() {  
+
+    i64 = Type::getInt64Ty(TheContext);
+
+     // Open a new context and module.
+    TheModule = std::make_unique<Module>("Grace IR", TheContext);
+
+    std::unique_ptr<Module> module = std::make_unique<Module>("MyModule", TheContext);
+
+    // declare void @writeInteger(i64)
+    FunctionType *writeInteger_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
+    writeInteger = Function::Create(writeInteger_type, Function::ExternalLinkage, "writeInteger", TheModule.get());
+
+     // declare void @writeChar(i8)
+    FunctionType *writeChar_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
+    writeChar = Function::Create(writeChar_type, Function::ExternalLinkage, "writeChar", TheModule.get());
+
+    // declare void @writeString(i8*)
+    FunctionType *writeString_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    writeString = Function::Create(writeString_type, Function::ExternalLinkage, "writeString", TheModule.get());
+
+
+    // Create a function named "main" with return type i32
+    FunctionType *funcType = FunctionType::get(Type::getInt32Ty(TheContext), false);
+    mainFunc = Function::Create(funcType, Function::ExternalLinkage, "main", TheModule.get());
+
+    // Create a basic block
+    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", mainFunc);
+
+    // Create an IR builder
+    builder.SetInsertPoint(BB);
+    // Emit the program code.
+    compile();
+    // Generate code: return 0;
+    Value *returnValue = ConstantInt::get(Type::getInt32Ty(TheContext), 0);
+    builder.CreateRet(returnValue);
+
+    printf("- \033[1;33mIR Generation\033[0m: \033[1;32mPASSED\033[0m\n");
+    /* printf("============================\n");
+    TheModule->print(outs(), nullptr);
+    printf("============================\n"); */
+
+    // Open the file for writing
+    std::error_code EC;
+    llvm::raw_fd_ostream outputFile("temp.ll", EC);
+      if (EC) {
+        printf("\033[1;31merror:\n\t\033[0m");
+        printf("Error opening file for writing IR.\n");
+        printf("- Compilation \033[1;31mFAILED\033[0m.\n");
+        exit(1);
+    }
+    TheModule->print(outputFile, nullptr);
+    printf("- \033[1;33mIR Save\033[0m: \033[1;32mPASSED\033[0m\n");
+
+  }
+
+protected:
+
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
@@ -53,6 +167,7 @@ public:
   virtual SymbolEntry * getSymbolEntry() {
     return new VarEntry();
   }
+
 protected:
   Datatype type;
 };
@@ -74,6 +189,12 @@ public:
   virtual void sem() override {
     type = TYPE_int;
   }
+
+  virtual Value *compile() override{
+    return  ConstantInt::get(Type::getInt32Ty(TheContext), num);
+  }
+
+
 private:
   int num;
 };
@@ -106,17 +227,17 @@ private:
   std::vector<int> const_list;
 };
 
-class Type: public Func {
+class TypeBts: public Func {
 public:
-  Type(){}
-  Type(Datatype s, ConstList *c = nullptr): type(s), const_list(c) {}
-  ~Type() { delete const_list; }
+  TypeBts(){}
+  TypeBts(Datatype s, ConstList *c = nullptr): type(s), const_list(c) {}
+  ~TypeBts() { delete const_list; }
   virtual void printOn(std::ostream &out) const override {
-    out << "Type(" << type;
+    out << "TypeBts(" << type;
     if (const_list->length() != 0) out << ", " << *const_list;
     out << ")";
   }
-  Datatype getType() {
+  Datatype getTypeBts() {
     return type;
   }
   std::vector<int> getConstList() {
@@ -149,6 +270,11 @@ public:
   virtual SymbolEntry *getSymbolEntry() override {
     return st.lookup(str, line, {TYPE_var, TYPE_array});
   }
+
+  virtual Value *compile() override {
+    return builder.CreateLoad(NamedValues[str]->getAllocatedType(), NamedValues[str], str);
+  }
+
 private:
   char *str;
   int line;
@@ -167,6 +293,42 @@ public:
   virtual char *getName() override {
     return str;
   }
+
+  char *getString(){
+    int i=1, j=0;
+    char* new_str = str;
+    do{
+      if(str[i]=='\"' && str[i-1]!='\\'){new_str[j] = '\0'; break;}
+      if(str[i]!='\\') new_str[j] = str[i];
+      else{
+        if(str[i+1]=='n') new_str[j] = '\n';
+        else if(str[i+1]=='t') new_str[j] = '\t';
+        else if(str[i+1]=='r') new_str[j] = '\r';
+        else if(str[i+1]=='0') new_str[j] = '\0';
+        else if(str[i+1]=='\\') new_str[j] = '\\';
+        else if(str[i+1]=='\'') new_str[j] = '\'';
+        else if(str[i+1]=='\"') new_str[j] = '\"';
+        else if(str[i+1]=='x'){
+          int n1, n2;
+          if(str[i+2] >= '0' && str[i+2] <= '9') n1 = str[i+2] -'0';
+          else n1 = str[i+2] -'a' +10;
+          if(str[i+3] >= '0' && str[i+3] <= '9') n2 = str[i+3] -'0';
+          else n2 = int(str[i+3]) -'a' +10;
+          new_str[j] = char(n1* 16 + n2);
+          i++;i++;
+        }
+        i++;
+      }
+      i++;
+      j++;
+    }while(str[i]!='\0');
+    return new_str;
+  }
+
+  virtual Value *compile() override {
+    return builder.CreateGlobalStringPtr(getString());
+  }
+
 private:
     char *str;
 };
@@ -183,6 +345,41 @@ public:
   virtual char *getName() override {
     return constchar;
   }
+
+  // GIATI EKANES TO CONSTCHAR CHAR* ???????
+  char getChar(){
+    int len;
+    for(int i=1;i<8;i++){
+      if(constchar[i]=='\''&& constchar[i+1]!='\'') //case of '\''
+      {
+        len = i+1;
+        break;
+      }
+    }
+    if(len == 3) return constchar[1];
+    if(len == 4){
+      if(constchar[2]=='n') return '\n';
+      if(constchar[2]=='t') return '\t';
+      if(constchar[2]=='r') return '\r';
+      if(constchar[2]=='0') return '\0';
+      if(constchar[2]=='\\') return '\\';
+      if(constchar[2]=='\'') return '\'';
+      else return '\"';
+    }
+    int n1, n2;
+    if(constchar[3] >= '0' && constchar[3] <= '9') n1 = constchar[3] -'0';
+    else n1 = constchar[3] -'a' +10;
+    if(constchar[4] >= '0' && constchar[4] <= '9') n2 = constchar[4] -'0';
+    else n2 = int(constchar[4]) -'a' +10;
+    return char(n1* 16 + n2);
+  }
+
+  virtual Value *compile() override{
+    std::string str = constchar;
+    return  ConstantInt::get(Type::getInt32Ty(TheContext), getChar());
+  }
+
+
 private:
   char *constchar;
 };
@@ -205,6 +402,18 @@ public:
   virtual SymbolEntry *getSymbolEntry() override {
     return st.lookup(lvalue->getName(), line, {TYPE_array});
   }
+
+
+  virtual Value *compile() override{
+    if(strcmp(typeid(*lvalue).name(), "2Id")==0){
+      //expr->getIndexes();
+    }
+    else{
+      return lvalue->compile();
+    }
+    return nullptr;
+  }
+
 private:
     Expr *lvalue;
     Expr *expr;
@@ -222,6 +431,11 @@ public:
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("+"));
     type = TYPE_int;
   }
+
+ virtual Value* compile()  override {
+    return expr->compile();
+  }
+
 private:
   Expr *expr;
   int line;
@@ -238,6 +452,12 @@ public:
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("-"));
     type = TYPE_int;
   }
+
+ virtual Value* compile()  override {
+    return builder.CreateMul(ConstantInt::get(Type::getInt32Ty(TheContext), -1) ,expr->compile(), "multmp");
+  }
+
+
 private:
   Expr *expr;
   int line;
@@ -254,6 +474,12 @@ public:
     expr->type_check(TYPE_bool, 4, line, const_cast<char*>("not"));
     type = TYPE_bool;
   }
+
+  virtual Value* compile()  override {
+    Value *e = expr->compile();
+    return builder.CreateNot(e, "ifcond");
+  }
+
 private:
   Expr *expr;
   int line;
@@ -271,6 +497,18 @@ public:
     right->type_check(TYPE_int, 5, line, op);
     type = TYPE_int;
   }
+
+  virtual Value* compile()  override {
+    Value *l = left->compile();
+    Value *r = right->compile();
+    if(strcmp(op, "+") == 0) return builder.CreateAdd(l, r, "addtmp");
+    if(strcmp(op, "-") == 0) return builder.CreateSub(l, r, "subtmp");
+    if(strcmp(op, "*") == 0) return builder.CreateMul(l, r, "multmp");
+    if(strcmp(op, "div") == 0) return builder.CreateSDiv(l, r, "divtmp");
+    if(strcmp(op, "mod") == 0) return builder.CreateSRem(l, r, "modtmp");
+    return nullptr;
+  }
+
 private:
   Expr *left;
   char *op;
@@ -294,6 +532,21 @@ public:
     }
     type = TYPE_bool;
   }
+
+  virtual Value* compile()  override {
+    Value *l = left->compile();
+    Value *r = right->compile();
+    if(strcmp(op, "=") == 0) return builder.CreateICmpEQ(l, r, "ifcond");
+    if(strcmp(op, "#") == 0) return builder.CreateICmpNE(l, r, "ifcond");
+    if(strcmp(op, ">") == 0) return builder.CreateICmpSGT(l, r, "ifcond");
+    if(strcmp(op, ">=") == 0) return builder.CreateICmpSGE(l, r, "ifcond");
+    if(strcmp(op, "<") == 0) return builder.CreateICmpSLT(l, r, "ifcond");
+    if(strcmp(op, "<=") == 0) return builder.CreateICmpSLE(l, r, "ifcond");
+    if(strcmp(op, "and") == 0) return builder.CreateAnd(l, r, "ifcond");
+    if(strcmp(op, "or") == 0) return builder.CreateOr(l, r, "ifcond");
+    return nullptr;
+  }
+
 private:
   Expr *left;
   char *op;
@@ -328,6 +581,15 @@ public:
       ++i;
     }
   }
+
+  /* IT WILL NEED CHANGES */
+  virtual Value *compile() override{
+    if(expr_list.size()==1){
+      return expr_list[0]->compile();
+    }
+    return nullptr;
+  }
+
 private:
   std::vector<Expr *> expr_list;
 };
@@ -380,6 +642,45 @@ public:
     SymbolEntry *e1 = expr1->getSymbolEntry();
     expr2->type_check(e1->getDatatype(), 9, line);
   }
+
+  virtual Value *compile() override {
+    if(strcmp(typeid(*expr1).name(), "2Id")==0) //Den 3erw giati 8eleri 2Id ??
+      builder.CreateStore(expr2->compile(), NamedValues[expr1->getName()]);
+    else{
+   /*      int dimensions = type->getConstList().size();
+        std::vector<int> sizes = type->getConstList();
+
+        // Calculate the total size of the N-dimensional array
+        Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
+        for (int i = 1; i < dimensions; ++i) {
+            totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
+        }
+
+        // Allocate memory for the N-dimensional array
+        AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
+        NamedValues[c] = arrayPtr;
+ */
+
+
+
+      char* id = expr1->getName();
+      Value *firstElementPtr = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  ConstantInt::get(Type::getInt32Ty(TheContext), 0  ));
+      builder.CreateStore(expr2->compile(), firstElementPtr);
+      //Value* index0 = ConstantInt::get(int32_t, 0);
+      //Value* elementPtr = builder.CreateGEP(Type::getInt32Ty(TheContex`t), id, {ConstantInt::get(Type::getInt32Ty(TheContext), 0)}));
+      //builder.CreateStore(ConstantInt::get(int32_t, 42), elementPtr);
+      //printf("%s\n", id);
+      //std::vector<int> indexes = expr1->getIndexes();
+/*      ArrayType *dimensions = ArrayType::get(Type::getInt32Ty(TheContext), indexes[0]);
+        for (long unsigned int i=1; i<indexes.size() ;i++) {
+          dimensions = ArrayType::get(dimensions, indexes[i]);
+        }
+      //Value* elementPtr = builder.CreateGEP(NamedValues[id], dimensions);
+      builder.CreateStore(expr2->compile(), NamedValues[id]); */
+    }
+    return nullptr;
+  }
+
 private:
   Expr *expr1;
   Expr *expr2;
@@ -401,6 +702,28 @@ public:
     stmt1->sem();
     if (stmt2 != nullptr) stmt2->sem();
   }
+
+  virtual Value *compile() override {
+    Value *CondV = cond->compile();
+    Function *TheFunction = builder.GetInsertBlock()->getParent();
+
+    // Create blocks for the then and else cases.  Insert the 'then' block at the
+    // end of the function.
+    BasicBlock *ThenBB = BasicBlock::Create(TheContext, "then", TheFunction);
+    BasicBlock *ElseBB = BasicBlock::Create(TheContext, "else", TheFunction);
+    BasicBlock *MergeBB = BasicBlock::Create(TheContext, "endif", TheFunction);
+
+    builder.CreateCondBr(CondV, ThenBB, ElseBB);
+    builder.SetInsertPoint(ThenBB);
+    stmt1->compile();
+    builder.CreateBr(MergeBB);
+    builder.SetInsertPoint(ElseBB);
+    if (stmt2!=nullptr) stmt2->compile();
+    builder.CreateBr(MergeBB);
+    builder.SetInsertPoint(MergeBB);
+    return nullptr;
+  }
+
 private:
   Expr *cond;
   Stmt *stmt1;
@@ -419,6 +742,32 @@ public:
     expr->type_check(TYPE_bool, 8, line);
     stmt->sem();
   }
+
+  virtual Value* compile() override {
+    Value *n = expr->compile();
+    BasicBlock *PrevBB = builder.GetInsertBlock();
+    Function *TheFunction = PrevBB->getParent();
+    BasicBlock *LoopBB =
+      BasicBlock::Create(TheContext, "loop", TheFunction);
+    BasicBlock *BodyBB =
+      BasicBlock::Create(TheContext, "body", TheFunction);
+    BasicBlock *AfterBB =
+      BasicBlock::Create(TheContext, "endwhile", TheFunction);
+    builder.CreateBr(LoopBB);
+    builder.SetInsertPoint(LoopBB);
+    PHINode *phi_iter = builder.CreatePHI(Type::getInt1Ty(TheContext), 2, "iter");
+    phi_iter->addIncoming(n, PrevBB);
+    Value *loop_cond = expr->compile();
+    builder.CreateCondBr(loop_cond, BodyBB, AfterBB);
+    builder.SetInsertPoint(BodyBB);
+    stmt->compile();
+    phi_iter->addIncoming(n, builder.GetInsertBlock());
+    builder.CreateBr(LoopBB);
+    builder.SetInsertPoint(AfterBB);
+    return nullptr;
+  }
+
+
 private:
   Expr *expr;
   Stmt *stmt;
@@ -443,6 +792,12 @@ public:
   virtual void sem() override {
     for (Stmt *s: stmt_list) s->sem();
   }
+
+  virtual Value *compile() override{
+    for (Stmt *s: stmt_list) s->compile();
+    return nullptr;
+  }
+
 private:
   std::vector<Stmt *> stmt_list;
 };
@@ -469,6 +824,25 @@ public:
       showSemanticError(13, line, id);
     }
   }
+
+  virtual Value *compile() override{
+    if(strcmp(id,"writeInteger")==0){
+      Value *n = expr_list->compile();
+      Value *n64 = builder.CreateZExt(n, Type::getInt64Ty(TheContext));
+      builder.CreateCall(writeInteger, std::vector<Value *> { n64 });
+    }
+    else if(strcmp(id,"writeChar")==0){
+      Value *c = expr_list->compile();
+      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
+      builder.CreateCall(writeChar, std::vector<Value *> { c64 });
+    }else if(strcmp(id,"writeString")==0){
+      Value *s = expr_list->compile();
+      Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+      builder.CreateCall(writeString, std::vector<Value *> { s64 });
+    }
+    return nullptr;
+  }
+
   void makeStmt() {
     isVoid = true;
   }
@@ -652,6 +1026,12 @@ public:
   virtual void sem() override {
     for(Func *ldef_elem : ldef_list) ldef_elem->sem();
   }
+
+  virtual Value *compile() override {
+    for(Func *ldef_elem : ldef_list) ldef_elem->compile();
+    return nullptr;
+  }
+
 private:
   std::vector<Func *> ldef_list;
 };
@@ -670,6 +1050,12 @@ public:
     block->sem();
     st.setCurrentFunctionDefined();
     st.closeScope(line);
+  }
+
+  virtual Value *compile() override{
+    local->compile();
+    block->compile();
+    return nullptr;
   }
 private:
   Header *head;
@@ -695,13 +1081,13 @@ private:
 
 class VarDef: public Func {
 public:
-  VarDef(IdList *id, Type *t, int l): id_list(id), type(t), line(l) {}
+  VarDef(IdList *id, TypeBts *t, int l): id_list(id), type(t), line(l) {}
   ~VarDef() { delete id_list; delete type; }
   virtual void printOn(std::ostream &out) const override {
     out << "VarDef(" << *id_list << ", " << *type << ")";
   }
   virtual void sem() override {
-    Datatype t = type->getType();
+    Datatype t = type->getTypeBts();
     std::vector<int> v = type->getConstList();
     if (v.size() == 0) {
       for (char *c : id_list->getIdList()) {
@@ -713,9 +1099,47 @@ public:
       }
     }
   }
+
+  virtual Value *compile() override {
+    if(type->getConstList().size()==0){
+      for (char *c : id_list->getIdList()) {
+        AllocaInst *Alloca  = CreateEntryBlockAllocaInt(mainFunc, c);
+        NamedValues[c] = Alloca;
+      }
+    }
+    else{
+      for (char *c : id_list->getIdList()) {
+
+        int dimensions = type->getConstList().size();
+        std::vector<int> sizes = type->getConstList();
+
+        // Calculate the total size of the N-dimensional array
+        Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
+        for (int i = 1; i < dimensions; ++i) {
+            totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
+        }
+
+        // Allocate memory for the N-dimensional array
+        AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
+        NamedValues[c] = arrayPtr;
+
+
+
+
+     /*    Value *dimensions = ConstantInt::get(Type::getInt32Ty(TheContext), type->getConstList()[0]);
+         for (long unsigned int i=1; i<type->getConstList().size() ;i++) {
+          dimensions = ConstantInt::get(dimensions, type->getConstList()[i]);
+        } 
+        AllocaInst *ArrayAlloc = builder.CreateAlloca(Type::getInt32Ty(TheContext), dimensions, c);
+        NamedValues[c] = ArrayAlloc; */
+      }
+    }
+    return nullptr;
+  }
+
 private:
   IdList *id_list;
-  Type *type;
+  TypeBts *type;
   int line;
 };
 

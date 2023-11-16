@@ -107,7 +107,7 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
-  printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");           
+  printf("- Compilation \033[1;31mFAILED\033[0m.\n");           
   exit(1);
 }
 
@@ -326,7 +326,7 @@ public:
             } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
                 showSemanticError(22, line, c);
             } else if (e != nullptr) {
-                for (int i = 0; i < n.size(); i++) {
+                for (int i = 0; i < int(n.size()); i++) {
                     if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
                         showSemanticError(22, line, c);
                     }
@@ -353,7 +353,7 @@ public:
             } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
                 showSemanticError(22, line, c);
             } else if (e != nullptr) {
-                for (int i = 0; i < n.size(); i++) {
+                for (int i = 0; i < int(n.size()); i++) {
                     if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
                         showSemanticError(22, line, c);
                     }
@@ -374,8 +374,9 @@ public:
             scopes[scopes.size() - 2].insertFunction(c, t, n, line, true);
         } else {
             scopes.back().insertFunction(c, t, n, line, true); 
-            scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false)}, line, true); 
-            scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true); 
+            scopes.back().insertFunction(const_cast<char *>("writeChar"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false)}, line, true); 
+            scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true); 
             scopes.back().insertFunction(const_cast<char *>("readInteger"), TYPE_int, {}, line, true); 
         }
     }

@@ -57,7 +57,7 @@ SymbolTable st;
   FparDef *fpardef;
   IdList *idlist;
   Datatype datatype;
-  Type *type;
+  TypeBts *type;
   ConstList *constlist;
   Datatype rettype;
   FparType *fpartype;
@@ -97,9 +97,15 @@ SymbolTable st;
 
 program: 
     func-def                            {   FuncDef *parsingTree = $1;
-                                            std::cout << "AST: " << *$1 << std::endl; 
-                                            printf("\033[1;32m- Successful parsing.\n\033[0m");
-                                            parsingTree->sem(); delete $1; }
+                                            printf("- \033[1;35mAST\033[0m:\n");
+                                            std::cout << "=================================================" << std::endl; 
+                                            std::cout << *$1 << std::endl; 
+                                            std::cout << "=================================================" << std::endl; 
+                                            printf("- \033[1;33mParsing\033[0m: \033[1;32mPASSED\n\033[0m");
+                                            parsingTree->sem();
+                                            printf("- \033[1;33mSemantic analysis\033[0m: \033[1;32mPASSED\033[0m\n");
+                                            parsingTree->llvm_compile_and_dump();
+                                            delete $1; }
 ;
 
 func-def: 
@@ -137,7 +143,7 @@ data-type:
 ;
 
 type:
-    data-type int-const_list            { $$ = new Type($1, $2);}
+    data-type int-const_list            { $$ = new TypeBts($1, $2);}
 ;
 
 int-const_list: 
@@ -247,12 +253,11 @@ void yyerror(const char *msg){
   printf("\033[1;35m%s\033[0m", yytext);
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", yylineno);
-  printf("\n- Compilation \033[1;31mFAILED\033[0m.\n");
+  printf("- Compilation \033[1;31mFAILED\033[0m.\n");
   exit(42);
 }
 
 int main() {
     int result = yyparse();
-    if (result == 0) printf("\033[1;32m- Semantics checked.\n\033[0m");
     return result;
 }
