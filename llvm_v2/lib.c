@@ -63,16 +63,18 @@ extern int32_t chr(int32_t x) {
 
 
 extern int32_t strlenGrace(int8_t *str) {
-    int i = 0;
+    return strlen(str);
+    /* int i = 0;
     while(str[i]!='\0'){
         i=i+1;
     }
-    return i;
+    return i; */
 }
 
 
 extern int32_t strcmpGrace(int8_t *str1, int8_t *str2) {
-    int i = 0;
+    return strcmp(str1, str2);
+    /* int i = 0;
     int result = 0;
     while(str1[i] !='\0' && str2[i] !='\0'){
         if(str1[i]!=str2[i]){
@@ -82,19 +84,21 @@ extern int32_t strcmpGrace(int8_t *str1, int8_t *str2) {
         i=i+1;
     }
     if(str1[i]!=str2[i]) result = -1;
-    return result;
+    return result; */
 }
 
 extern void strcpyGrace(int8_t *str1, int8_t *str2) {
-    int i = 0;
+    strcpy(str1, str2);
+    /* int i = 0;
     while(str2[i] !='\0'){
         str1[i]=str2[i];
         i=i+1;
     }
-    str1[i]=str2[i];
+    str1[i]=str2[i]; */
 }
 extern void strcatGrace(int8_t *str1, int8_t *str2) {
-    int i = 0;
+    strcat(str1, str2);
+    /* int i = 0;
     while(str1[i] !='\0'){
         str1[i] = str1[i];
         i=i+1;
@@ -105,5 +109,5 @@ extern void strcatGrace(int8_t *str1, int8_t *str2) {
         i=i+1;
         j=j+1;
     }
-    str1[i] = str2[j];
+    str1[i] = str2[j]; */
 }
