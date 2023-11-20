@@ -378,6 +378,14 @@ public:
             scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true);
             scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true); 
             scopes.back().insertFunction(const_cast<char *>("readInteger"), TYPE_int, {}, line, true); 
+            scopes.back().insertFunction(const_cast<char *>("readChar"), TYPE_char, {}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("readString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("ascii"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("chr"), TYPE_char, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strlen"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcmp"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcpy"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcat"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);  
         }
     }
     void addScopeNameAndType(char* c, Datatype t) {

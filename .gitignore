@@ -24,7 +24,7 @@
 /semantics/parser.hpp
 /semantics/parser.o
 /semantics/parser.output
-/semantics/grace
+/semantics/graceCompiler
 /semantics/a.out
 /semantics/lib.a
 /semantics/lib.o

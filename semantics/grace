@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 set -e
 
-#make
+make
 
 echo -e "${CYAN}"
 echo "   \$\$\$\$\$\$\\"                                         
@@ -23,7 +23,7 @@ echo "  \\\$\$\$\$\$\$  |\$\$ |     \\$\$\$\$\$\$\$ |\\\$\$\$\$\$\$\$\\ \\\$\$\$
 echo "   \______/ \__|      \_______| \_______| \_______|"
 echo -e "${NC}"
 
-./grace <$1
+./graceCompiler <$1
 llc temp.ll
 echo -e "- ${YELLOW}Assemble Generation${NC}: ${GREEN}PASSED${NC}"
 clang -no-pie temp.s lib.a

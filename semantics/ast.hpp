@@ -42,12 +42,26 @@ using namespace llvm;
 static LLVMContext TheContext;
 static std::unique_ptr<Module> TheModule;
 static std::map<std::string, AllocaInst*> NamedValues;
+static std::map<std::string, std::vector<int>> ArrDimensions;
+static std::map<std::string, int> isCharVar;
 static IRBuilder<> builder(TheContext);
 static Function* mainFunc;
 
 static Function *writeInteger;
 static Function *writeChar;
 static Function *writeString;
+
+static Function *readInteger;
+static Function *readChar;
+static Function *readString;
+
+static Function *ascii;
+static Function *chr;
+
+static Function *strlenGrace;
+static Function *strcmpGrace;
+static Function *strcpyGrace;
+static Function *strcatGrace;
 
 // Useful LLVM types.
 //static Type *i8;
@@ -56,15 +70,11 @@ static Type *i64;
 
 /// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
 /// the function.  This is used for mutable variables etc.
-static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, const std::string &VarName) {
+/* static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, const std::string &VarName) {
   IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
   return TmpB.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, VarName);
-}
-
-/* static AllocaInst *CreateEntryBlockAllocaChar(Function *TheFunction, const std::string &VarName) {
-  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, VarName);
 } */
+
 
 
 class AST {
@@ -72,7 +82,7 @@ public:
   virtual void printOn(std::ostream &out) const = 0;
   virtual ~AST() {}
   virtual void sem(){}
-  virtual Value *compile(){return 0;}// = 0;
+  virtual Value *compile(){return 0;}
 
   void llvm_compile_and_dump() {  
 
@@ -87,13 +97,50 @@ public:
     FunctionType *writeInteger_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
     writeInteger = Function::Create(writeInteger_type, Function::ExternalLinkage, "writeInteger", TheModule.get());
 
-     // declare void @writeChar(i8)
+     // declare void @writeChar(i64)
     FunctionType *writeChar_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
     writeChar = Function::Create(writeChar_type, Function::ExternalLinkage, "writeChar", TheModule.get());
 
-    // declare void @writeString(i8*)
-    FunctionType *writeString_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    // declare void @writeString(i64*)
+    FunctionType *writeString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i64, 0) }, false);
     writeString = Function::Create(writeString_type, Function::ExternalLinkage, "writeString", TheModule.get());
+
+    // declare void @readInteger()
+    FunctionType *readInteger_type = FunctionType::get(Type::getInt32Ty(TheContext), false);
+    readInteger = Function::Create(readInteger_type, Function::ExternalLinkage, "readInteger", TheModule.get());
+
+    // declare void @readChar()
+    FunctionType *readChar_type = FunctionType::get(Type::getInt8Ty(TheContext), false);
+    readChar = Function::Create(readChar_type, Function::ExternalLinkage, "readChar", TheModule.get());
+
+    // declare void @readString(i64*)
+    FunctionType *readString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    readString = Function::Create(readString_type, Function::ExternalLinkage, "readString", TheModule.get());
+
+    // declare void @ascii(i64*)
+    FunctionType *ascii_type = FunctionType::get(Type::getInt32Ty(TheContext),  std::vector<Type *> { i64 }, false);
+    ascii = Function::Create(ascii_type, Function::ExternalLinkage, "ascii", TheModule.get());
+
+    // declare void @chr(*i64)
+    FunctionType *chr_type = FunctionType::get(Type::getInt8Ty(TheContext), std::vector<Type *> { i64 }, false);
+    chr = Function::Create(chr_type, Function::ExternalLinkage, "chr", TheModule.get());
+
+    // declare void @strlenGrace()
+    FunctionType *strlenGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    strlenGrace = Function::Create(strlenGrace_type, Function::ExternalLinkage, "strlenGrace", TheModule.get());
+    
+    // declare void @strcmpGrace()
+    FunctionType *strcmpGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    strcmpGrace = Function::Create(strcmpGrace_type, Function::ExternalLinkage, "strcmpGrace", TheModule.get());
+
+    // declare void @strcpyGrace()
+    FunctionType *strcpyGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    strcpyGrace = Function::Create(strcpyGrace_type, Function::ExternalLinkage, "strcpyGrace", TheModule.get());
+
+    // declare void @strcatGrace()
+    FunctionType *strcatGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    strcatGrace = Function::Create(strcatGrace_type, Function::ExternalLinkage, "strcatGrace", TheModule.get());
+
 
 
     // Create a function named "main" with return type i32
@@ -164,9 +211,19 @@ public:
   virtual char *getName() {
     return const_cast<char *>("");
   }
-  virtual SymbolEntry * getSymbolEntry() {
-    return new VarEntry();
+
+  virtual Value *getOffset(char* c, int i) {
+    return 0;
   }
+
+  virtual SymbolEntry * getSymbolEntry() {
+    return new VarEntry();  
+  }
+
+  virtual std::string getTypeOfExpr() {
+    return "";
+  }
+  
 
 protected:
   Datatype type;
@@ -193,7 +250,6 @@ public:
   virtual Value *compile() override{
     return  ConstantInt::get(Type::getInt32Ty(TheContext), num);
   }
-
 
 private:
   int num;
@@ -275,6 +331,9 @@ public:
     return builder.CreateLoad(NamedValues[str]->getAllocatedType(), NamedValues[str], str);
   }
 
+  virtual std::string getTypeOfExpr() override{
+    return "Id";
+  }
 private:
   char *str;
   int line;
@@ -311,9 +370,9 @@ public:
         else if(str[i+1]=='x'){
           int n1, n2;
           if(str[i+2] >= '0' && str[i+2] <= '9') n1 = str[i+2] -'0';
-          else n1 = str[i+2] -'a' +10;
+          else n1 = str[i+2] -'A' +10;
           if(str[i+3] >= '0' && str[i+3] <= '9') n2 = str[i+3] -'0';
-          else n2 = int(str[i+3]) -'a' +10;
+          else n2 = int(str[i+3]) -'A' +10;
           new_str[j] = char(n1* 16 + n2);
           i++;i++;
         }
@@ -327,6 +386,10 @@ public:
 
   virtual Value *compile() override {
     return builder.CreateGlobalStringPtr(getString());
+  }
+
+  virtual std::string getTypeOfExpr() override{
+    return "String";
   }
 
 private:
@@ -368,15 +431,15 @@ public:
     }
     int n1, n2;
     if(constchar[3] >= '0' && constchar[3] <= '9') n1 = constchar[3] -'0';
-    else n1 = constchar[3] -'a' +10;
+    else n1 = constchar[3] -'A' +10;
     if(constchar[4] >= '0' && constchar[4] <= '9') n2 = constchar[4] -'0';
-    else n2 = int(constchar[4]) -'a' +10;
+    else n2 = int(constchar[4]) -'A' +10;
     return char(n1* 16 + n2);
   }
 
   virtual Value *compile() override{
     std::string str = constchar;
-    return  ConstantInt::get(Type::getInt32Ty(TheContext), getChar());
+    return  ConstantInt::get(Type::getInt8Ty(TheContext), getChar());
   }
 
 
@@ -404,14 +467,42 @@ public:
   }
 
 
-  virtual Value *compile() override{
-    if(strcmp(typeid(*lvalue).name(), "2Id")==0){
-      //expr->getIndexes();
+  virtual Value *getOffset(char* c, int levelOfRecursion) override{
+    int sizeOfTheRestOftheArray = 1;
+    for(long unsigned int j=levelOfRecursion; j<ArrDimensions[c].size(); j++){
+      sizeOfTheRestOftheArray *= ArrDimensions[c][j];
+    }
+    if(lvalue->getTypeOfExpr() == "Id"){
+        return builder.CreateMul(expr->compile(), ConstantInt::get(Type::getInt32Ty(TheContext),sizeOfTheRestOftheArray));      
     }
     else{
-      return lvalue->compile();
+        return builder.CreateAdd(lvalue->getOffset(c, levelOfRecursion-1),
+                                  builder.CreateMul(expr->compile(), ConstantInt::get(Type::getInt32Ty(TheContext),sizeOfTheRestOftheArray)));
+    } 
+  }
+
+  virtual Value *compile() override{
+    char* id = lvalue->getName();
+    if(strcmp(typeid(*lvalue).name(), "2Id")==0){
+      if(isCharVar[id] == 1){
+        return builder.CreateLoad(NamedValues[id]->getAllocatedType(), builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
+      }
+      else{
+        return builder.CreateLoad(NamedValues[id]->getAllocatedType(), builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
+      }
+      
     }
-    return nullptr;
+    else{
+      Value *offset = getOffset(id, ArrDimensions[id].size());
+      Value *elementPtr;
+      if(isCharVar[id] == 1){
+        elementPtr = builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+      }
+      else{
+        elementPtr = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {offset});
+      }
+      return builder.CreateLoad(NamedValues[id]->getAllocatedType(),  elementPtr, id);
+    }
   }
 
 private:
@@ -583,11 +674,21 @@ public:
   }
 
   /* IT WILL NEED CHANGES */
-  virtual Value *compile() override{
-    if(expr_list.size()==1){
-      return expr_list[0]->compile();
+  std::vector<Value *> compile_ExprList(){
+    std::vector<Value *> v;
+    for (Expr *c : expr_list) {
+      v.push_back(c->compile());
     }
-    return nullptr;
+    return v;
+  }
+
+  
+  std::vector<Expr *> getExprList(){
+    std::vector<Expr *> v;
+    for (Expr *c : expr_list) {
+      v.push_back(c);
+    }
+    return v;
   }
 
 private:
@@ -647,36 +748,17 @@ public:
     if(strcmp(typeid(*expr1).name(), "2Id")==0) //Den 3erw giati 8eleri 2Id ??
       builder.CreateStore(expr2->compile(), NamedValues[expr1->getName()]);
     else{
-   /*      int dimensions = type->getConstList().size();
-        std::vector<int> sizes = type->getConstList();
-
-        // Calculate the total size of the N-dimensional array
-        Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
-        for (int i = 1; i < dimensions; ++i) {
-            totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
-        }
-
-        // Allocate memory for the N-dimensional array
-        AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
-        NamedValues[c] = arrayPtr;
- */
-
-
-
       char* id = expr1->getName();
-      Value *firstElementPtr = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  ConstantInt::get(Type::getInt32Ty(TheContext), 0  ));
-      builder.CreateStore(expr2->compile(), firstElementPtr);
-      //Value* index0 = ConstantInt::get(int32_t, 0);
-      //Value* elementPtr = builder.CreateGEP(Type::getInt32Ty(TheContex`t), id, {ConstantInt::get(Type::getInt32Ty(TheContext), 0)}));
-      //builder.CreateStore(ConstantInt::get(int32_t, 42), elementPtr);
-      //printf("%s\n", id);
-      //std::vector<int> indexes = expr1->getIndexes();
-/*      ArrayType *dimensions = ArrayType::get(Type::getInt32Ty(TheContext), indexes[0]);
-        for (long unsigned int i=1; i<indexes.size() ;i++) {
-          dimensions = ArrayType::get(dimensions, indexes[i]);
-        }
-      //Value* elementPtr = builder.CreateGEP(NamedValues[id], dimensions);
-      builder.CreateStore(expr2->compile(), NamedValues[id]); */
+      std::vector<int> dimensions = ArrDimensions[id];
+      Value *offset = expr1->getOffset(id, dimensions.size());
+      Value *elementPtr;
+      if(isCharVar[id] == 1){
+        elementPtr = builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+      }
+      else{
+        elementPtr = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {offset});
+      }
+      builder.CreateStore(expr2->compile(), elementPtr);
     }
     return nullptr;
   }
@@ -827,19 +909,153 @@ public:
 
   virtual Value *compile() override{
     if(strcmp(id,"writeInteger")==0){
-      Value *n = expr_list->compile();
+      Value *n = expr_list->compile_ExprList()[0];
       Value *n64 = builder.CreateZExt(n, Type::getInt64Ty(TheContext));
       builder.CreateCall(writeInteger, std::vector<Value *> { n64 });
+      return nullptr;
     }
     else if(strcmp(id,"writeChar")==0){
-      Value *c = expr_list->compile();
+      Value *c = expr_list->compile_ExprList()[0];
       Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
       builder.CreateCall(writeChar, std::vector<Value *> { c64 });
-    }else if(strcmp(id,"writeString")==0){
-      Value *s = expr_list->compile();
-      Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
-      builder.CreateCall(writeString, std::vector<Value *> { s64 });
+      return nullptr;
     }
+    else if(strcmp(id,"writeString")==0){
+      if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
+        Value *s = expr_list->compile_ExprList()[0];
+        Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        return nullptr;
+      }
+      else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        return nullptr;
+      }
+      else{
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        return nullptr;
+      }
+    }
+    else if(strcmp(id,"readInteger")==0){
+      return builder.CreateCall(readInteger);
+    }
+    else if(strcmp(id,"readChar")==0){
+      return builder.CreateCall(readChar);
+    }
+    else if(strcmp(id,"readString")==0){
+      if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        builder.CreateCall(readString, std::vector<Value *> { s64 });
+        return nullptr;
+      }
+      else{
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        builder.CreateCall(readString, std::vector<Value *> { s64 });
+        return nullptr;
+      }
+    }
+    else if(strcmp(id,"ascii")==0){
+      Value *c = expr_list->compile_ExprList()[0];
+      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
+      return builder.CreateCall(ascii, std::vector<Value *> { c64 });
+    }
+    else if(strcmp(id,"chr")==0){
+      Value *c = expr_list->compile_ExprList()[0];
+      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
+      return builder.CreateCall(chr, std::vector<Value *> { c64 });
+    }
+    else if(strcmp(id,"strlen")==0){
+      if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
+        Value *s = expr_list->compile_ExprList()[0];
+        Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+      }
+      else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+      }
+      else{
+        char* id = (expr_list->getExprList())[0]->getName();
+        Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
+        Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+      }
+    }
+
+    else if(strcmp(id,"strcmp")==0 || strcmp(id,"strcpy")==0 || strcmp(id,"strcat")==0){
+    Value *s64_1, *s64_2;
+    std::vector<Value *> listValueOfParam = expr_list->compile_ExprList();
+    
+    if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
+      Value *s = listValueOfParam[0];
+      s64_1 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+    }
+    else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
+      char* id = (expr_list->getExprList())[0]->getName();
+      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+      s64_1 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+    }
+    else{
+      char* id = (expr_list->getExprList())[0]->getName();
+      Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
+      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+      s64_1 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+    }
+
+    if (((expr_list->getExprList())[1])->getTypeOfExpr() == "String") {
+      Value *s = listValueOfParam[1];
+      s64_2 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+    }
+    else if(((expr_list->getExprList())[1])->getTypeOfExpr() == "Id"){
+      char* id = (expr_list->getExprList())[1]->getName();
+      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+      s64_2 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+    }
+    else{
+      char* id = (expr_list->getExprList())[1]->getName();
+      Value *offset = ((expr_list->getExprList())[1])->getOffset(id, ArrDimensions[id].size()-1);
+      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
+      s64_2 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+    }
+
+      if(strcmp(id,"strcmp")==0)
+        return builder.CreateCall(strcmpGrace, std::vector<Value *> { s64_1, s64_2 });
+      if(strcmp(id,"strcpy")==0){
+        builder.CreateCall(strcpyGrace, std::vector<Value *> { s64_1, s64_2 });
+        return nullptr;
+      }
+      if(strcmp(id,"strcat")==0){
+        builder.CreateCall(strcatGrace, std::vector<Value *> { s64_1, s64_2 });
+        return nullptr;
+      }
+      
+    }
+
     return nullptr;
   }
 
@@ -1103,35 +1319,53 @@ public:
   virtual Value *compile() override {
     if(type->getConstList().size()==0){
       for (char *c : id_list->getIdList()) {
-        AllocaInst *Alloca  = CreateEntryBlockAllocaInt(mainFunc, c);
-        NamedValues[c] = Alloca;
+        if(type->getTypeBts() == TYPE_char){
+          isCharVar[c] = 1;
+          AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, c);
+          NamedValues[c] = Alloca;
+        }
+        else{
+          isCharVar[c] = 0;
+          AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, c);
+          NamedValues[c] = Alloca;
+        }
       }
     }
     else{
       for (char *c : id_list->getIdList()) {
+        if(type->getTypeBts() == TYPE_char){
+          isCharVar[c] = 1;
+          int dimensions = type->getConstList().size();
+          std::vector<int> sizes = type->getConstList();
 
-        int dimensions = type->getConstList().size();
-        std::vector<int> sizes = type->getConstList();
+          // Calculate the total size of the N-dimensional array
+          Value *totalSize = ConstantInt::get(Type::getInt8Ty(TheContext),  type->getConstList()[0]);
+          for (int i = 1; i < dimensions; ++i) {
+              totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt8Ty(TheContext), sizes[i]));
+          }
 
-        // Calculate the total size of the N-dimensional array
-        Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
-        for (int i = 1; i < dimensions; ++i) {
-            totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
+          // Allocate memory for the N-dimensional array
+          AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt8Ty(TheContext), totalSize, c);
+          NamedValues[c] = arrayPtr;
+          ArrDimensions[c] = sizes;
         }
+        else{
+          isCharVar[c] = 0;
+          int dimensions = type->getConstList().size();
+          std::vector<int> sizes = type->getConstList();
 
-        // Allocate memory for the N-dimensional array
-        AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
-        NamedValues[c] = arrayPtr;
+          // Calculate the total size of the N-dimensional array
+          Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
+          for (int i = 1; i < dimensions; ++i) {
+              totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
+          }
 
+          // Allocate memory for the N-dimensional array
+          AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
+          NamedValues[c] = arrayPtr;
+          ArrDimensions[c] = sizes;
 
-
-
-     /*    Value *dimensions = ConstantInt::get(Type::getInt32Ty(TheContext), type->getConstList()[0]);
-         for (long unsigned int i=1; i<type->getConstList().size() ;i++) {
-          dimensions = ConstantInt::get(dimensions, type->getConstList()[i]);
-        } 
-        AllocaInst *ArrayAlloc = builder.CreateAlloca(Type::getInt32Ty(TheContext), dimensions, c);
-        NamedValues[c] = ArrayAlloc; */
+        }
       }
     }
     return nullptr;
