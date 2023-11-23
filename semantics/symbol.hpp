@@ -104,6 +104,14 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Function " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " is already defined with different parameters";
+  } else if (errorCode == 23) {
+    std::cerr << "Function " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " must have type void and no parameters.";
+  } else if (errorCode == 24) {
+    std::cerr << "Array parameter " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " must be a reference.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);
@@ -122,23 +130,56 @@ public:
     IdType getType() {
         return type;
     };
-    virtual std::vector<Datatype> getParameterTypes() = 0;
+    int getNumOfDimensions() {
+        return numdim;
+    }
+    std::vector<int> getDimensions() {
+        return dim;
+    }
+    virtual std::vector<Datatype> getParameterDatatypes() = 0;
     virtual std::vector<char *> getParameterNames() = 0;
+    virtual std::vector<bool> getParameterRefs() = 0;
+    virtual std::vector<IdType> getParameterTypes() = 0;
+    virtual std::vector<int> getParameterNumOfDimensions() = 0;
+    virtual std::vector<std::vector<int>> getParameterDimensions() = 0;
     virtual void setDefined() = 0;
     virtual bool checkDefined() = 0;
 
 protected:
     Datatype datatype;
     IdType type;
+    int numdim;
+    std::vector<int> dim;
 };
 
 class FunctionParameter : public SymbolEntry {
 public:
-    FunctionParameter(char *n, Datatype t, bool isArray, std::vector<int> d = {}) : name(n), isArray(isArray), dimensions(d) { datatype = t; }
-    virtual std::vector<Datatype> getParameterTypes() override {
+    FunctionParameter(char *n, Datatype t, bool isArray, bool isRef, std::vector<int> d = {}) : name(n), isArray(isArray), isRef(isRef), dimensions(d) { 
+        datatype = t; 
+        if (isArray == true) {
+            type = TYPE_array;
+        } else {
+            type = TYPE_var;
+        }
+        numdim = d.size();
+        dim = d;
+    }
+    virtual std::vector<Datatype> getParameterDatatypes() override {
         return {};
     };
     virtual std::vector<char *> getParameterNames() override {
+        return {};
+    };
+    virtual std::vector<bool> getParameterRefs() override {
+        return {};
+    };
+    virtual std::vector<IdType> getParameterTypes() override {
+        return {};
+    };
+    virtual std::vector<int> getParameterNumOfDimensions() override {
+        return {};
+    };
+    virtual std::vector<std::vector<int>> getParameterDimensions() override {
         return {};
     };
     virtual void setDefined() override {}
@@ -148,9 +189,13 @@ public:
     char * getName() {
         return name;
     }
+    bool getRef() {
+        return isRef;
+    }
 private:
     char *name;
     bool isArray;
+    bool isRef;
     std::vector<int> dimensions;
 };
 
@@ -161,11 +206,25 @@ public:
     VarEntry(Datatype t) { 
         datatype = t;
         type = TYPE_var;
+        numdim = 0;
+        dim = {};
     }
-    virtual std::vector<Datatype> getParameterTypes() override {
+    virtual std::vector<Datatype> getParameterDatatypes() override {
         return {};
     };
     virtual std::vector<char *> getParameterNames() override {
+        return {};
+    };
+    virtual std::vector<bool> getParameterRefs() override {
+        return {};
+    };
+    virtual std::vector<IdType> getParameterTypes() override {
+        return {};
+    };
+    virtual std::vector<int> getParameterNumOfDimensions() override {
+        return {};
+    };
+    virtual std::vector<std::vector<int>> getParameterDimensions() override {
         return {};
     };
     virtual void setDefined() override {}
@@ -179,11 +238,25 @@ public:
     ArrayEntry(Datatype t, int n, std::vector<int> d) : num_dimensions(n), dimensions(d) { 
         datatype = t;
         type = TYPE_array;
+        numdim = n;
+        dim = d;
     }
-    virtual std::vector<Datatype> getParameterTypes() override {
+    virtual std::vector<Datatype> getParameterDatatypes() override {
         return {};
     };
     virtual std::vector<char *> getParameterNames() override {
+        return {};
+    };
+    virtual std::vector<bool> getParameterRefs() override {
+        return {};
+    };
+    virtual std::vector<IdType> getParameterTypes() override {
+        return {};
+    };
+    virtual std::vector<int> getParameterNumOfDimensions() override {
+        return {};
+    };
+    virtual std::vector<std::vector<int>> getParameterDimensions() override {
         return {};
     };
     virtual void setDefined() override {}
@@ -201,8 +274,10 @@ public:
     FunctionEntry(Datatype t, int n, std::vector<FunctionParameter> p, bool isDefined) : num_parameters(n), parameters(p), isDefined(isDefined) { 
         datatype = t; 
         type = TYPE_function;
+        numdim = 0;
+        dim = {};
     }
-    virtual std::vector<Datatype> getParameterTypes() override {
+    virtual std::vector<Datatype> getParameterDatatypes() override {
         std::vector<Datatype> v = {};
         for (int i = 0; i < num_parameters; ++i)
         {
@@ -215,6 +290,38 @@ public:
         for (int i = 0; i < num_parameters; ++i)
         {
             v.push_back(parameters[i].getName());
+        }
+        return v;
+    };
+    virtual std::vector<bool> getParameterRefs() override {
+        std::vector<bool> v = {};
+        for (int i = 0; i < num_parameters; ++i)
+        {
+            v.push_back(parameters[i].getRef());
+        }
+        return v;
+    };
+    virtual std::vector<IdType> getParameterTypes() override {
+        std::vector<IdType> v = {};
+        for (int i = 0; i < num_parameters; ++i)
+        {
+            v.push_back(parameters[i].getType());
+        }
+        return v;
+    };
+    virtual std::vector<int> getParameterNumOfDimensions() override {
+        std::vector<int> v = {};
+        for (int i = 0; i < num_parameters; ++i)
+        {
+            v.push_back(parameters[i].getNumOfDimensions());
+        }
+        return v;
+    };
+    virtual std::vector<std::vector<int>> getParameterDimensions() override {
+        std::vector<std::vector<int>> v = {};
+        for (int i = 0; i < num_parameters; ++i)
+        {
+            v.push_back(parameters[i].getDimensions());
         }
         return v;
     };
@@ -319,16 +426,30 @@ public:
         scopes.back().insertArray(c, t, n, line); 
     }
     void insertFunction(char *c, Datatype t, std::vector<FunctionParameter> n, int line, bool isDefined) {
+        for (int i = 0; i < int(n.size()); i++) {
+            if (n[i].getType() == TYPE_array && n[i].getRef() == false) {
+                showSemanticError(24, line, n[i].getName());
+            }
+        }
+
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
             if (e != nullptr && e->getDatatype() != t) {
                 showSemanticError(21, line, c, e->getDatatype());
-            } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
+            } else if (e != nullptr && n.size() != e->getParameterDatatypes().size()) {
                 showSemanticError(22, line, c);
             } else if (e != nullptr) {
                 for (int i = 0; i < int(n.size()); i++) {
-                    if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
+                    if (e->getParameterDatatypes()[i] != n[i].getDatatype() || e->getParameterTypes()[i] != n[i].getType() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName()) || e->getParameterRefs()[i] != n[i].getRef() || e->getParameterNumOfDimensions()[i] != n[i].getNumOfDimensions()) {
                         showSemanticError(22, line, c);
+                    } else {
+                        std::vector<int> dimParam1 = e->getParameterDimensions()[i];
+                        std::vector<int> dimParam2 = n[i].getDimensions();
+                        for (int j = 0; j < int(dimParam1.size()); j++) {
+                            if (dimParam1[j] != dimParam2[j]) {
+                                showSemanticError(22, line, c);
+                            }
+                        }
                     }
                 }
             }
@@ -346,16 +467,34 @@ public:
         scopes.back().insertFunction(c, t, n, line, isDefined); 
     }
     void insertFunctionToPreviousScope(char *c, Datatype t, std::vector<FunctionParameter> n, int line) {
+        if (scopes.size() == 1 && (t != TYPE_nothing || n.size() > 0)) {
+            showSemanticError(23, line, c);
+        }
+
+        for (int i = 0; i < int(n.size()); i++) {
+            if (n[i].getType() == TYPE_array && n[i].getRef() == false) {
+                showSemanticError(24, line, n[i].getName());
+            }
+        }
+
         for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
             SymbolEntry * e = i->lookup(c, {TYPE_function});
             if (e != nullptr && e->getDatatype() != t) {
                 showSemanticError(21, line, c, e->getDatatype());
-            } else if (e != nullptr && n.size() != e->getParameterTypes().size()) {
+            } else if (e != nullptr && n.size() != e->getParameterDatatypes().size()) {
                 showSemanticError(22, line, c);
             } else if (e != nullptr) {
                 for (int i = 0; i < int(n.size()); i++) {
-                    if (e->getParameterTypes()[i] != n[i].getDatatype() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName())) {
+                    if (e->getParameterDatatypes()[i] != n[i].getDatatype() || e->getParameterTypes()[i] != n[i].getType() || std::string(e->getParameterNames()[i]) != std::string(n[i].getName()) || e->getParameterRefs()[i] != n[i].getRef() || e->getParameterNumOfDimensions()[i] != n[i].getNumOfDimensions()) {
                         showSemanticError(22, line, c);
+                    } else {
+                        std::vector<int> dimParam1 = e->getParameterDimensions()[i];
+                        std::vector<int> dimParam2 = n[i].getDimensions();
+                        for (int j = 0; j < int(dimParam1.size()); j++) {
+                            if (dimParam1[j] != dimParam2[j]) {
+                                showSemanticError(22, line, c);
+                            }
+                        }
                     }
                 }
             }
@@ -374,18 +513,18 @@ public:
             scopes[scopes.size() - 2].insertFunction(c, t, n, line, true);
         } else {
             scopes.back().insertFunction(c, t, n, line, true); 
-            scopes.back().insertFunction(const_cast<char *>("writeChar"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false)}, line, true); 
-            scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true); 
+            scopes.back().insertFunction(const_cast<char *>("writeChar"), TYPE_nothing, {FunctionParameter(const_cast<char *>("c"), TYPE_char, false, false)}, line, true); 
+            scopes.back().insertFunction(const_cast<char *>("writeInteger"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("writeString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("s"), TYPE_char, true, true, {0})}, line, true); 
             scopes.back().insertFunction(const_cast<char *>("readInteger"), TYPE_int, {}, line, true); 
             scopes.back().insertFunction(const_cast<char *>("readChar"), TYPE_char, {}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("readString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("ascii"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false)}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("chr"), TYPE_char, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false)}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("strlen"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("strcmp"), TYPE_int, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("strcpy"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);
-            scopes.back().insertFunction(const_cast<char *>("strcat"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, {1})}, line, true);  
+            scopes.back().insertFunction(const_cast<char *>("readString"), TYPE_nothing, {FunctionParameter(const_cast<char *>("n"), TYPE_char, false, false), FunctionParameter(const_cast<char *>("s"), TYPE_char, true, true, {0})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("ascii"), TYPE_int, {FunctionParameter(const_cast<char *>("c"), TYPE_char, false, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("chr"), TYPE_char, {FunctionParameter(const_cast<char *>("n"), TYPE_int, false, false)}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strlen"), TYPE_int, {FunctionParameter(const_cast<char *>("s"), TYPE_char, true, true, {0})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcmp"), TYPE_int, {FunctionParameter(const_cast<char *>("s1"), TYPE_char, true, true, {0}), FunctionParameter(const_cast<char *>("s2"), TYPE_char, true, true, {0})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcpy"), TYPE_nothing, {FunctionParameter(const_cast<char *>("trg"), TYPE_char, true, true, {0}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, true, {0})}, line, true);
+            scopes.back().insertFunction(const_cast<char *>("strcat"), TYPE_nothing, {FunctionParameter(const_cast<char *>("trg"), TYPE_char, true, true, {0}), FunctionParameter(const_cast<char *>("n"), TYPE_char, true, true, {0})}, line, true);  
         }
     }
     void addScopeNameAndType(char* c, Datatype t) {

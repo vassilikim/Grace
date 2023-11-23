@@ -896,9 +896,9 @@ public:
   virtual void sem() override {
     SymbolEntry *e = st.lookup(id, line, {TYPE_function});
     if (expr_list != nullptr) {
-      expr_list->exprListSem(e->getParameterTypes(), line, id);
+      expr_list->exprListSem(e->getParameterDatatypes(), line, id);
     } 
-    else if (e->getParameterTypes().size() != 0) {
+    else if (e->getParameterDatatypes().size() != 0) {
       showSemanticError(14, line, id);
     }
     type = e->getDatatype();
@@ -1142,6 +1142,7 @@ public:
         for (char *c : id_list->getIdList()) {
           st.insertArray(c, t, v, line);
         }
+        
       }
     }
   }
@@ -1152,11 +1153,11 @@ public:
       std::vector<int> v = fpar_type->getConstList();
       if (v.size() == 0) {
         for (char *c : id_list->getIdList()) {
-          s.push_back(FunctionParameter(c, t, false));
+          s.push_back(FunctionParameter(c, t, false, ref));
         }
       } else {
         for (char *c : id_list->getIdList()) {
-          s.push_back(FunctionParameter(c, t, false, v));
+          s.push_back(FunctionParameter(c, t, true, ref, v));
         }
       }
     }
