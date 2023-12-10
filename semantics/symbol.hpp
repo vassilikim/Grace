@@ -128,6 +128,10 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Variable " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " is not an array.";
+  } else if (errorCode == 29) {
+    std::cerr << "The string " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot be part of an arithmetic or boolean expression.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);

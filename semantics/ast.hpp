@@ -496,7 +496,9 @@ public:
       expr->semArrayCall(innerDimensions.size());
       expr->sem();
     } else if (expr->getTypeOfExpr() == "String") {
-      showSemanticError(26, line, expr->getName());
+      showSemanticError(2, line, expr->getName());
+    } else {
+      expr->sem();
     }
 
     type = st.lookup(lvalue->getName(), line, {TYPE_array})->getDatatype();
@@ -556,6 +558,21 @@ public:
     out << "Plus(" << *expr << ")";
   }
   virtual void sem() override {
+    SymbolEntry *e = expr->getSymbolEntry();
+    std::vector<int> innerDimensions = e->getDimensions();
+    if (innerDimensions.size() == 0 && expr->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() == "Array") {
+      expr->semArrayCall(innerDimensions.size());
+      expr->sem();
+    } else if (expr->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, expr->getName());
+    } else {
+      expr->sem();
+    }
+
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("+"));
     type = TYPE_int;
   }
@@ -577,6 +594,21 @@ public:
     out << "Minus(" << *expr << ")";
   }
   virtual void sem() override {
+    SymbolEntry *e = expr->getSymbolEntry();
+    std::vector<int> innerDimensions = e->getDimensions();
+    if (innerDimensions.size() == 0 && expr->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() == "Array") {
+      expr->semArrayCall(innerDimensions.size());
+      expr->sem();
+    } else if (expr->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, expr->getName());
+    } else {
+      expr->sem();
+    }
+
     expr->type_check(TYPE_int, 3, line, const_cast<char*>("-"));
     type = TYPE_int;
   }
@@ -621,6 +653,36 @@ public:
     out << op << "(" << *left << ", " << *right << ")";
   }
   virtual void sem() override {
+    SymbolEntry *e1 = left->getSymbolEntry();
+    std::vector<int> innerDimensions1 = e1->getDimensions();
+    if (innerDimensions1.size() == 0 && left->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, left->getName());
+    } else if (innerDimensions1.size() > 0 && left->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, left->getName());
+    } else if (innerDimensions1.size() > 0 && left->getTypeOfExpr() == "Array") {
+      left->semArrayCall(innerDimensions1.size());
+      left->sem();
+    } else if (left->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, left->getName());
+    } else {
+      left->sem();
+    }
+
+    SymbolEntry *e2 = right->getSymbolEntry();
+    std::vector<int> innerDimensions2 = e2->getDimensions();
+    if (innerDimensions2.size() == 0 && right->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, right->getName());
+    } else if (innerDimensions2.size() > 0 && right->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, right->getName());
+    } else if (innerDimensions2.size() > 0 && right->getTypeOfExpr() == "Array") {
+      right->semArrayCall(innerDimensions2.size());
+      right->sem();
+    } else if (right->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, right->getName());
+    } else {
+      right->sem();
+    }
+
     left->type_check(TYPE_int, 5, line, op);
     right->type_check(TYPE_int, 5, line, op);
     type = TYPE_int;
@@ -652,6 +714,36 @@ public:
     out << op << "(" << *left << ", " << *right << ")";
   }
   virtual void sem() override {
+    SymbolEntry *e1 = left->getSymbolEntry();
+    std::vector<int> innerDimensions1 = e1->getDimensions();
+    if (innerDimensions1.size() == 0 && left->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, left->getName());
+    } else if (innerDimensions1.size() > 0 && left->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, left->getName());
+    } else if (innerDimensions1.size() > 0 && left->getTypeOfExpr() == "Array") {
+      left->semArrayCall(innerDimensions1.size());
+      left->sem();
+    } else if (left->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, left->getName());
+    } else {
+      left->sem();
+    }
+
+    SymbolEntry *e2 = right->getSymbolEntry();
+    std::vector<int> innerDimensions2 = e2->getDimensions();
+    if (innerDimensions2.size() == 0 && right->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, right->getName());
+    } else if (innerDimensions2.size() > 0 && right->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, right->getName());
+    } else if (innerDimensions2.size() > 0 && right->getTypeOfExpr() == "Array") {
+      right->semArrayCall(innerDimensions2.size());
+      right->sem();
+    } else if (right->getTypeOfExpr() == "String") {
+      showSemanticError(29, line, right->getName());
+    } else {
+      right->sem();
+    }
+
     if(op[0]=='a'||op[0]=='o') {
       left->type_check(TYPE_bool, 4, line, op);
       right->type_check(TYPE_bool, 4, line, op);
@@ -755,7 +847,21 @@ public:
   virtual void sem() override {
     Datatype t = st.getCurrentScopeDatatype();
     if (expr != nullptr) {
-      expr->sem();
+      SymbolEntry *e = expr->getSymbolEntry();
+      std::vector<int> innerDimensions = e->getDimensions();
+      if (innerDimensions.size() == 0 && expr->getTypeOfExpr() == "Array") {
+        showSemanticError(28, line, expr->getName());
+      } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() != "Array") {
+        showSemanticError(25, line, expr->getName());
+      } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() == "Array") {
+        expr->semArrayCall(innerDimensions.size());
+        expr->sem();
+      } else if (expr->getTypeOfExpr() == "String") {
+        showSemanticError(17, line, st.getCurrentScopeName(), t);
+      } else {
+        expr->sem();
+      }
+
       expr->type_check(t, 16, line, st.getCurrentScopeName());
     } else if (t != TYPE_nothing) {
       showSemanticError(17, line, st.getCurrentScopeName(), t);
