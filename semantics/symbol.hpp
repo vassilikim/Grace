@@ -112,6 +112,22 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Array parameter " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " must be a reference.";
+  } else if (errorCode == 25) {
+    std::cerr << "Array " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " has wrong number of dimensions.";
+  } else if (errorCode == 26) {
+    std::cerr << "String " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot be assigned a value.";
+  } else if (errorCode == 27) {
+    std::cerr << "String " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot be assigned as a value.";
+  } else if (errorCode == 28) {
+    std::cerr << "Variable " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " is not an array.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);

@@ -223,6 +223,10 @@ public:
   virtual std::string getTypeOfExpr() {
     return "";
   }
+
+  virtual void semArrayCall(int dimensions) {
+    return;
+  }
   
 
 protected:
@@ -455,15 +459,48 @@ public:
     out << "ArrayCall(" << *lvalue << ", " << *expr << ")";
   }
   virtual void sem() override {
-    lvalue->sem();
-    type = st.lookup(lvalue->getName(), line, {TYPE_array})->getDatatype();
-    expr->type_check(TYPE_int, 2, line);
+    return;
   }
   virtual char *getName() override {
     return lvalue->getName();
   }
   virtual SymbolEntry *getSymbolEntry() override {
     return st.lookup(lvalue->getName(), line, {TYPE_array});
+  }
+  virtual std::string getTypeOfExpr() override{
+    return "Array";
+  }
+  virtual void semArrayCall(int dimensions) override {
+    dimensions--;
+    if (dimensions > 0) {
+      if (lvalue->getTypeOfExpr() == "Array") {
+        lvalue->semArrayCall(dimensions);
+      } else {
+        showSemanticError(25, line, lvalue->getName());
+      }
+    } else {
+      if (lvalue->getTypeOfExpr() == "Array") {
+        showSemanticError(25, line, lvalue->getName());
+      } else {
+        lvalue->sem();
+      }
+    }
+
+    SymbolEntry *e = expr->getSymbolEntry();
+    std::vector<int> innerDimensions = e->getDimensions();
+    if (innerDimensions.size() == 0 && expr->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, expr->getName());
+    } else if (innerDimensions.size() > 0 && expr->getTypeOfExpr() == "Array") {
+      expr->semArrayCall(innerDimensions.size());
+      expr->sem();
+    } else if (expr->getTypeOfExpr() == "String") {
+      showSemanticError(26, line, expr->getName());
+    }
+
+    type = st.lookup(lvalue->getName(), line, {TYPE_array})->getDatatype();
+    expr->type_check(TYPE_int, 2, line);
   }
 
 
@@ -738,9 +775,36 @@ public:
     out << "Assignment(" << *expr1 << ", " << *expr2 << ")";
   }
   virtual void sem() override {
-    expr1->sem();
-    expr2->sem();
     SymbolEntry *e1 = expr1->getSymbolEntry();
+    std::vector<int> dimensions = e1->getDimensions();
+    if (dimensions.size() == 0 && expr1->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, expr1->getName());
+    } else if (dimensions.size() > 0 && expr1->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, expr1->getName());
+    } else if (dimensions.size() > 0 && expr1->getTypeOfExpr() == "Array") {
+      expr1->semArrayCall(dimensions.size());
+      expr1->sem();
+    } else if (expr1->getTypeOfExpr() == "String") {
+      showSemanticError(26, line, expr1->getName());
+    } else {
+      expr1->sem();
+    }
+
+    SymbolEntry *e2 = expr2->getSymbolEntry();
+    std::vector<int> dimensions2 = e2->getDimensions();
+    if (dimensions2.size() == 0 && expr2->getTypeOfExpr() == "Array") {
+      showSemanticError(28, line, expr2->getName());
+    } else if (dimensions2.size() > 0 && expr2->getTypeOfExpr() != "Array") {
+      showSemanticError(25, line, expr2->getName());
+    } else if (dimensions2.size() > 0 && expr2->getTypeOfExpr() == "Array") {
+      expr1->semArrayCall(dimensions2.size());
+      expr1->sem();
+    } else if (expr2->getTypeOfExpr() == "String") {
+      showSemanticError(27, line, expr2->getName());
+    } else {
+      expr2->sem();
+    }
+
     expr2->type_check(e1->getDatatype(), 9, line);
   }
 
