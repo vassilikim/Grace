@@ -96,3 +96,4 @@ echo "Elapsed Time: $formatted_time ms"
 #filename=$1
 #cp temp.imm "${filename%.*}.imm"
 #cp temp.asm "${filename%.*}.asm"
+exit 0
