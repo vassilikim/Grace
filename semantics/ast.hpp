@@ -800,7 +800,7 @@ private:
 
 class ExprList: public Stmt {
 public:
-  ExprList(): expr_list() {}
+  ExprList(int l): expr_list(), line(l) {}
   ~ExprList() { for (Expr *e : expr_list) delete e;}
   void append(Expr *e) { expr_list.push_back(e); }
   void putinfront(Expr *e) { expr_list.insert(expr_list.begin(), e); }
@@ -814,14 +814,48 @@ public:
     }
     out << ")";
   }
-  virtual void exprListSem(std::vector<Datatype> types, int l, char* f) {
-    if (expr_list.size() != types.size()) {
+  virtual void exprListSem(SymbolEntry* func, int l, char* f) {
+    std::vector<Datatype> datatypes = func->getParameterDatatypes();
+    std::vector<std::vector<int>> dimensions = func->getParameterDimensions();
+    if (expr_list.size() != datatypes.size()) {
       showSemanticError(14, l, f);
     }
     int i = 0;
-    for (Expr *e : expr_list) {
-      e->sem();
-      e->type_check(types[i], 15, l, e->getName());
+    for (Expr *expr : expr_list) {
+      SymbolEntry *e = expr->getSymbolEntry();
+      std::vector<int> exprDimensions = e->getDimensions();
+      // var is not an array, but gets array call
+      if (expr->getTypeOfExpr() == "Array" && exprDimensions.size() == 0) {
+        showSemanticError(28, line, expr->getName());
+      // var is an array, does not get array call
+      } else if (expr->getTypeOfExpr() != "Array" && exprDimensions.size() > 0) {
+        if (dimensions[i].size() == exprDimensions.size()) {
+          expr->sem();
+        } else {
+          showSemanticError(30, line, func->getParameterNames()[i]);
+        }
+      // var is an array, gets array call
+      } else if (expr->getTypeOfExpr() == "Array" && exprDimensions.size() > 0) {
+        if (dimensions[i].size() >= exprDimensions.size()) {
+          showSemanticError(30, line, func->getParameterNames()[i]);
+        } else if (dimensions[i].size() < exprDimensions.size()) {
+          expr->semArrayCall(exprDimensions.size() - dimensions[i].size());
+          expr->sem();
+        }
+      // var is not an array, does not get array call
+      } else if (expr->getTypeOfExpr() != "Array" && exprDimensions.size() == 0) {
+        if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 0) {
+          showSemanticError(31, line, func->getParameterNames()[i]);
+        } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 1) {
+          expr->sem();
+        } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() > 0) {
+          showSemanticError(30, line, func->getParameterNames()[i]);
+        } else {
+          expr->sem();
+        }
+      }
+
+      expr->type_check(datatypes[i], 15, l, expr->getName());
       ++i;
     }
   }
@@ -886,6 +920,7 @@ public:
 
 private:
   std::vector<Expr *> expr_list;
+  int line;
 };
 
 
@@ -1132,7 +1167,7 @@ public:
   virtual void sem() override {
     SymbolEntry *e = st.lookup(id, line, {TYPE_function});
     if (expr_list != nullptr) {
-      expr_list->exprListSem(e->getParameterDatatypes(), line, id);
+      expr_list->exprListSem(e, line, id);
     } 
     else if (e->getParameterDatatypes().size() != 0) {
       showSemanticError(14, line, id);

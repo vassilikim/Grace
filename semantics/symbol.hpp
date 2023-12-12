@@ -132,6 +132,14 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "The string " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " cannot be part of an arithmetic or boolean expression.";
+  } else if (errorCode == 30) {
+    std::cerr << "Array parameter " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " has wrong number of dimensions in func call.";
+  } else if (errorCode == 31) {
+    std::cerr << "Variable parameter " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot be assigned a string value.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);

@@ -204,7 +204,7 @@ func-call:
 ;
 
 expr_list: 
-    /*nothing*/                         { $$ = new ExprList(); }
+    /*nothing*/                         { $$ = new ExprList(yylineno); }
 |   expr_list ',' expr                  { $1->append($3); $$ = $1; }
 ;
 
