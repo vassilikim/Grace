@@ -6,7 +6,7 @@
 
 extern int yylineno;
 extern char *yytext;
-
+extern bool optimOption;
 
 SymbolTable st;
 %}
@@ -99,7 +99,8 @@ program:
     func-def                            {   FuncDef *parsingTree = $1;
                                             printf("- \033[1;35mAST\033[0m:\n");
                                             std::cout << "=================================================" << std::endl; 
-                                            std::cout << *$1 << std::endl; 
+                                            std::cout << "Remove the comment in the parser.y line 103 to display it." << std::endl; 
+                                            //std::cout << *$1 << std::endl; 
                                             std::cout << "=================================================" << std::endl; 
                                             printf("- \033[1;33mParsing\033[0m: \033[1;32mPASSED\n\033[0m");
                                             parsingTree->sem();
@@ -257,7 +258,9 @@ void yyerror(const char *msg){
   exit(42);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if(argc==2) optimOption = true;
+    else optimOption = false;
     int result = yyparse();
     return result;
 }

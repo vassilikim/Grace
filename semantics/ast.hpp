@@ -20,30 +20,31 @@ extern int yylineno;
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Verifier.h"
-#include <llvm/Support/raw_ostream.h>
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils.h"
-/* 
-#include "llvm/ADT/APInt.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
-*/
 
 using namespace llvm;
 
 // Global LLVM variables related to the LLVM suite.
 static LLVMContext TheContext;
 static std::unique_ptr<Module> TheModule;
-static std::map<std::string, AllocaInst*> NamedValues;
+
+static std::map<std::string, Value *> NamedValues;
+static std::map<std::string, Type *> NamedValuesTypes;
 static std::map<std::string, std::vector<int>> ArrDimensions;
 static std::map<std::string, int> isCharVar;
+
+static Function* firstFunc;
+static bool firstFuncDefined=false;
+static std::map<std::string, Function*> FuncPtr;
+static std::map<std::string, std::vector<Type *>>  funcParamTypes;
+static std::map<std::string, std::vector<int>>  funcParamRefs;
+static std::map<std::string, Datatype> ReturnTypesOfFunc;
+
 static IRBuilder<> builder(TheContext);
 static Function* mainFunc;
 
@@ -64,18 +65,12 @@ static Function *strcpyGrace;
 static Function *strcatGrace;
 
 // Useful LLVM types.
-//static Type *i8;
-//static Type *i32;
+static Type *i8;
+static Type *i32;
 static Type *i64;
 
-/// CreateEntryBlockAlloca - Create an alloca instruction in the entry block of
-/// the function.  This is used for mutable variables etc.
-/* static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, const std::string &VarName) {
-  IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
-  return TmpB.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, VarName);
-} */
-
-
+static bool optimOption;
+static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
 
 class AST {
 public:
@@ -86,23 +81,39 @@ public:
 
   void llvm_compile_and_dump() {  
 
+    i8 = Type::getInt8Ty(TheContext);
+    i32 = Type::getInt32Ty(TheContext);
     i64 = Type::getInt64Ty(TheContext);
 
      // Open a new context and module.
     TheModule = std::make_unique<Module>("Grace IR", TheContext);
 
-    std::unique_ptr<Module> module = std::make_unique<Module>("MyModule", TheContext);
+    TheFPM = std::make_unique<legacy::FunctionPassManager>(TheModule.get());
 
-    // declare void @writeInteger(i64)
-    FunctionType *writeInteger_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
+    printf("- \033[1;33mOptimization Selected\033[0m: ");
+    if(optimOption) printf("\033[1;32mYES\033[0m\n");
+    else printf("\033[1;31mNO\033[0m\n");
+
+    if(optimOption){
+      TheFPM->add(createPromoteMemoryToRegisterPass());
+      TheFPM->add(createInstructionCombiningPass());
+      TheFPM->add(createReassociatePass());
+      TheFPM->add(createGVNPass()); 
+      TheFPM->add(createCFGSimplificationPass());
+    }
+
+    TheFPM->doInitialization();
+ 
+    // declare void @writeInteger()
+    FunctionType *writeInteger_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i32 }, false);
     writeInteger = Function::Create(writeInteger_type, Function::ExternalLinkage, "writeInteger", TheModule.get());
 
-     // declare void @writeChar(i64)
-    FunctionType *writeChar_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i64 }, false);
+     // declare void @writeChar()
+    FunctionType *writeChar_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { i8 }, false);
     writeChar = Function::Create(writeChar_type, Function::ExternalLinkage, "writeChar", TheModule.get());
 
-    // declare void @writeString(i64*)
-    FunctionType *writeString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    // declare void @writeString()
+    FunctionType *writeString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i8, 0) }, false);
     writeString = Function::Create(writeString_type, Function::ExternalLinkage, "writeString", TheModule.get());
 
     // declare void @readInteger()
@@ -113,65 +124,58 @@ public:
     FunctionType *readChar_type = FunctionType::get(Type::getInt8Ty(TheContext), false);
     readChar = Function::Create(readChar_type, Function::ExternalLinkage, "readChar", TheModule.get());
 
-    // declare void @readString(i64*)
-    FunctionType *readString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    // declare void @readString()
+    FunctionType *readString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i8, 0) }, false);
     readString = Function::Create(readString_type, Function::ExternalLinkage, "readString", TheModule.get());
 
-    // declare void @ascii(i64*)
-    FunctionType *ascii_type = FunctionType::get(Type::getInt32Ty(TheContext),  std::vector<Type *> { i64 }, false);
+    // declare void @ascii()
+    FunctionType *ascii_type = FunctionType::get(Type::getInt32Ty(TheContext),  std::vector<Type *> { i8 }, false);
     ascii = Function::Create(ascii_type, Function::ExternalLinkage, "ascii", TheModule.get());
 
-    // declare void @chr(*i64)
-    FunctionType *chr_type = FunctionType::get(Type::getInt8Ty(TheContext), std::vector<Type *> { i64 }, false);
+    // declare void @chr()
+    FunctionType *chr_type = FunctionType::get(Type::getInt8Ty(TheContext), std::vector<Type *> { i32 }, false);
     chr = Function::Create(chr_type, Function::ExternalLinkage, "chr", TheModule.get());
 
     // declare void @strlenGrace()
-    FunctionType *strlenGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i64, 0) }, false);
+    FunctionType *strlenGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i8, 0) }, false);
     strlenGrace = Function::Create(strlenGrace_type, Function::ExternalLinkage, "strlenGrace", TheModule.get());
     
     // declare void @strcmpGrace()
-    FunctionType *strcmpGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    FunctionType *strcmpGrace_type = FunctionType::get(Type::getInt32Ty(TheContext), std::vector<Type *> { PointerType::get(i8, 0), PointerType::get(i8, 0) }, false);
     strcmpGrace = Function::Create(strcmpGrace_type, Function::ExternalLinkage, "strcmpGrace", TheModule.get());
 
     // declare void @strcpyGrace()
-    FunctionType *strcpyGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    FunctionType *strcpyGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i8, 0), PointerType::get(i8, 0) }, false);
     strcpyGrace = Function::Create(strcpyGrace_type, Function::ExternalLinkage, "strcpyGrace", TheModule.get());
 
     // declare void @strcatGrace()
-    FunctionType *strcatGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i64, 0), PointerType::get(i64, 0) }, false);
+    FunctionType *strcatGrace_type = FunctionType::get(Type::getVoidTy(TheContext), std::vector<Type *> { PointerType::get(i8, 0), PointerType::get(i8, 0) }, false);
     strcatGrace = Function::Create(strcatGrace_type, Function::ExternalLinkage, "strcatGrace", TheModule.get());
 
 
-
-    // Create a function named "main" with return type i32
-    FunctionType *funcType = FunctionType::get(Type::getInt32Ty(TheContext), false);
-    mainFunc = Function::Create(funcType, Function::ExternalLinkage, "main", TheModule.get());
-
-    // Create a basic block
-    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", mainFunc);
-
-    // Create an IR builder
-    builder.SetInsertPoint(BB);
+   
     // Emit the program code.
     compile();
-    // Generate code: return 0;
+    FunctionType *funcType = FunctionType::get(Type::getInt32Ty(TheContext), false);
+    mainFunc = Function::Create(funcType, Function::ExternalLinkage, "main", TheModule.get());
+    BasicBlock *BB = BasicBlock::Create(TheContext, "entry", mainFunc);
+    builder.SetInsertPoint(BB);
+    builder.CreateCall(firstFunc);
     Value *returnValue = ConstantInt::get(Type::getInt32Ty(TheContext), 0);
     builder.CreateRet(returnValue);
 
     printf("- \033[1;33mIR Generation\033[0m: \033[1;32mPASSED\033[0m\n");
-    /* printf("============================\n");
-    TheModule->print(outs(), nullptr);
-    printf("============================\n"); */
 
     // Open the file for writing
     std::error_code EC;
-    llvm::raw_fd_ostream outputFile("temp.ll", EC);
+    llvm::raw_fd_ostream outputFile("temp.imm", EC);
       if (EC) {
         printf("\033[1;31merror:\n\t\033[0m");
         printf("Error opening file for writing IR.\n");
         printf("- Compilation \033[1;31mFAILED\033[0m.\n");
         exit(1);
     }
+
     TheModule->print(outputFile, nullptr);
     printf("- \033[1;33mIR Save\033[0m: \033[1;32mPASSED\033[0m\n");
 
@@ -216,6 +220,10 @@ public:
     return 0;
   }
 
+  virtual int numOfDimensionsPassed(int recursion) {
+    return 0;
+  }
+
   virtual SymbolEntry * getSymbolEntry() {
     return new VarEntry();  
   }
@@ -238,7 +246,15 @@ class Stmt: public AST {
 };
 
 class Func: public AST {
+  public:
 
+    virtual Datatype getDataype() {return TYPE_nothing;}
+
+    virtual std::string getFuncName() {return nullptr;}
+
+    virtual std::string getTypeOfFunc() {return "";}
+
+    virtual void findFparTypes(std::string funcName) {}
 };
 
 class Const: public Expr {
@@ -332,7 +348,7 @@ public:
   }
 
   virtual Value *compile() override {
-    return builder.CreateLoad(NamedValues[str]->getAllocatedType(), NamedValues[str], str);
+    return builder.CreateLoad(NamedValuesTypes[str], NamedValues[str], str);
   }
 
   virtual std::string getTypeOfExpr() override{
@@ -506,6 +522,7 @@ public:
   }
 
 
+
   virtual Value *getOffset(char* c, int levelOfRecursion) override{
     int sizeOfTheRestOftheArray = 1;
     for(long unsigned int j=levelOfRecursion; j<ArrDimensions[c].size(); j++){
@@ -520,14 +537,20 @@ public:
     } 
   }
 
+
+  virtual int numOfDimensionsPassed(int recursion) override{
+    if(lvalue->getTypeOfExpr() == "Id") return recursion;
+    return lvalue->numOfDimensionsPassed(recursion+1);
+  }
+
   virtual Value *compile() override{
     char* id = lvalue->getName();
     if(strcmp(typeid(*lvalue).name(), "2Id")==0){
       if(isCharVar[id] == 1){
-        return builder.CreateLoad(NamedValues[id]->getAllocatedType(), builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
+        return builder.CreateLoad(NamedValuesTypes[id], builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
       }
       else{
-        return builder.CreateLoad(NamedValues[id]->getAllocatedType(), builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
+        return builder.CreateLoad(NamedValuesTypes[id], builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {expr->compile()}), id);
       }
       
     }
@@ -536,11 +559,12 @@ public:
       Value *elementPtr;
       if(isCharVar[id] == 1){
         elementPtr = builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
+        return builder.CreateLoad(NamedValuesTypes[id],  elementPtr, id);
       }
       else{
         elementPtr = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {offset});
+        return builder.CreateLoad(NamedValuesTypes[id],  elementPtr, id);
       }
-      return builder.CreateLoad(NamedValues[id]->getAllocatedType(),  elementPtr, id);
     }
   }
 
@@ -803,10 +827,50 @@ public:
   }
 
   /* IT WILL NEED CHANGES */
-  std::vector<Value *> compile_ExprList(){
+  std::vector<Value *> compile_ExprList(bool libFunc = true, std::string funcName = ""){
     std::vector<Value *> v;
-    for (Expr *c : expr_list) {
-      v.push_back(c->compile());
+    if(libFunc){
+      for (Expr *c : expr_list) {
+        v.push_back(c->compile());
+      }
+    }
+    else{
+      if(funcParamRefs.find(funcName)== funcParamRefs.end()) 
+        return v;
+      std::vector<int> paramRefs = funcParamRefs[funcName];
+      long unsigned int i=-1;
+      for (Expr *c : expr_list) {      
+        i++;
+        if(paramRefs[i] == 0){ v.push_back(c->compile()); continue;}
+        
+        /* FOR REF*/
+        char *id = c->getName();
+        std::string typeOfExpr = c->getTypeOfExpr();
+        
+        /* IF IT IS ID*/
+        if(typeOfExpr == "Id"){
+          if(isCharVar[id] == 1)
+           v.push_back(builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)}));
+          else
+            v.push_back(builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)}));
+          continue;
+        }
+        
+        /*IF IT IS STRING*/
+        if(typeOfExpr == "String"){
+          v.push_back(c->compile());
+          continue;
+        }
+        
+        /*IF IT IS ARRAY*/
+        int numOfDimensionPassed = c->numOfDimensionsPassed(1);
+        Value *offset = c->getOffset(id, numOfDimensionPassed);
+        if(isCharVar[id] == 1)
+           v.push_back( builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset}));
+          else
+            v.push_back( builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[id],  {offset}));
+
+      }
     }
     return v;
   }
@@ -868,6 +932,15 @@ public:
     }
     st.setCurrentScopeReturned();
   }
+  virtual Value *compile() override {
+    if(expr != nullptr)
+      builder.CreateStore(expr->compile(), NamedValues["_returnValue"]);
+    builder.CreateBr(BasicBlock::Create(TheContext, "return"));
+
+    return nullptr;
+  }
+
+
 private:
   int line;
   Expr *expr;
@@ -996,26 +1069,19 @@ public:
   }
 
   virtual Value* compile() override {
-    Value *n = expr->compile();
-    BasicBlock *PrevBB = builder.GetInsertBlock();
-    Function *TheFunction = PrevBB->getParent();
-    BasicBlock *LoopBB =
-      BasicBlock::Create(TheContext, "loop", TheFunction);
-    BasicBlock *BodyBB =
-      BasicBlock::Create(TheContext, "body", TheFunction);
-    BasicBlock *AfterBB =
-      BasicBlock::Create(TheContext, "endwhile", TheFunction);
-    builder.CreateBr(LoopBB);
-    builder.SetInsertPoint(LoopBB);
-    PHINode *phi_iter = builder.CreatePHI(Type::getInt1Ty(TheContext), 2, "iter");
-    phi_iter->addIncoming(n, PrevBB);
-    Value *loop_cond = expr->compile();
-    builder.CreateCondBr(loop_cond, BodyBB, AfterBB);
-    builder.SetInsertPoint(BodyBB);
+
+    Value *CondV = expr->compile();
+    Function *TheFunction = builder.GetInsertBlock()->getParent();
+
+    BasicBlock *DoBB = BasicBlock::Create(TheContext, "do", TheFunction);
+    BasicBlock *EndWhileBB = BasicBlock::Create(TheContext, "endwhile", TheFunction);
+
+    builder.CreateCondBr(CondV, DoBB, EndWhileBB);
+    builder.SetInsertPoint(DoBB);
     stmt->compile();
-    phi_iter->addIncoming(n, builder.GetInsertBlock());
-    builder.CreateBr(LoopBB);
-    builder.SetInsertPoint(AfterBB);
+    CondV = expr->compile();
+    builder.CreateCondBr(CondV, DoBB, EndWhileBB);
+    builder.SetInsertPoint(EndWhileBB);
     return nullptr;
   }
 
@@ -1079,39 +1145,29 @@ public:
 
   virtual Value *compile() override{
     if(strcmp(id,"writeInteger")==0){
-      Value *n = expr_list->compile_ExprList()[0];
-      Value *n64 = builder.CreateZExt(n, Type::getInt64Ty(TheContext));
-      builder.CreateCall(writeInteger, std::vector<Value *> { n64 });
+      builder.CreateCall(writeInteger, expr_list->compile_ExprList());
       return nullptr;
     }
     else if(strcmp(id,"writeChar")==0){
-      Value *c = expr_list->compile_ExprList()[0];
-      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
-      builder.CreateCall(writeChar, std::vector<Value *> { c64 });
+      builder.CreateCall(writeChar, expr_list->compile_ExprList());
       return nullptr;
     }
     else if(strcmp(id,"writeString")==0){
       if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
-        Value *s = expr_list->compile_ExprList()[0];
-        Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
-        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        builder.CreateCall(writeString, expr_list->compile_ExprList());
         return nullptr;
       }
       else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
         char* id = (expr_list->getExprList())[0]->getName();
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        builder.CreateCall(writeString, std::vector<Value *> { s });
         return nullptr;
       }
       else{
         char* id = (expr_list->getExprList())[0]->getName();
         Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        builder.CreateCall(writeString, std::vector<Value *> { s64 });
+        builder.CreateCall(writeString, std::vector<Value *> { s });
         return nullptr;
       }
     }
@@ -1125,105 +1181,93 @@ public:
       if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
         char* id = (expr_list->getExprList())[0]->getName();
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        builder.CreateCall(readString, std::vector<Value *> { s64 });
+        builder.CreateCall(readString, std::vector<Value *> { s });
         return nullptr;
       }
       else{
         char* id = (expr_list->getExprList())[0]->getName();
         Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        builder.CreateCall(readString, std::vector<Value *> { s64 });
+        builder.CreateCall(readString, std::vector<Value *> { s });
         return nullptr;
       }
     }
     else if(strcmp(id,"ascii")==0){
       Value *c = expr_list->compile_ExprList()[0];
-      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
-      return builder.CreateCall(ascii, std::vector<Value *> { c64 });
+      return builder.CreateCall(ascii, std::vector<Value *> { c });
     }
     else if(strcmp(id,"chr")==0){
       Value *c = expr_list->compile_ExprList()[0];
-      Value *c64 = builder.CreateZExt(c, Type::getInt64Ty(TheContext));
-      return builder.CreateCall(chr, std::vector<Value *> { c64 });
+      return builder.CreateCall(chr, std::vector<Value *> { c });
     }
     else if(strcmp(id,"strlen")==0){
       if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
         Value *s = expr_list->compile_ExprList()[0];
-        Value *s64 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
-        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s });
       }
       else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
         char* id = (expr_list->getExprList())[0]->getName();
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s });
       }
       else{
         char* id = (expr_list->getExprList())[0]->getName();
         Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-        Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-        Value *s64 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
-        return builder.CreateCall(strlenGrace, std::vector<Value *> { s64 });
+        return builder.CreateCall(strlenGrace, std::vector<Value *> { s });
       }
     }
-
     else if(strcmp(id,"strcmp")==0 || strcmp(id,"strcpy")==0 || strcmp(id,"strcat")==0){
-    Value *s64_1, *s64_2;
+    Value *s_1, *s_2;
     std::vector<Value *> listValueOfParam = expr_list->compile_ExprList();
     
     if (((expr_list->getExprList())[0])->getTypeOfExpr() == "String") {
-      Value *s = listValueOfParam[0];
-      s64_1 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+      s_1 = listValueOfParam[0];
     }
     else if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
       char* id = (expr_list->getExprList())[0]->getName();
-      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-      s64_1 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+      s_1 =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
     }
     else{
       char* id = (expr_list->getExprList())[0]->getName();
       Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
-      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-      s64_1 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+      s_1 =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
     }
 
     if (((expr_list->getExprList())[1])->getTypeOfExpr() == "String") {
-      Value *s = listValueOfParam[1];
-      s64_2 = builder.CreateZExt(s, Type::getInt64PtrTy(TheContext));
+      s_2 = listValueOfParam[1];
     }
     else if(((expr_list->getExprList())[1])->getTypeOfExpr() == "Id"){
       char* id = (expr_list->getExprList())[1]->getName();
-      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-      s64_2 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+      s_2 =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
     }
     else{
       char* id = (expr_list->getExprList())[1]->getName();
       Value *offset = ((expr_list->getExprList())[1])->getOffset(id, ArrDimensions[id].size()-1);
-      Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-      Value *IntPtr = builder.CreatePtrToInt(s, builder.getInt64Ty());
-      s64_2 = builder.CreateIntToPtr(IntPtr, builder.getInt64Ty()->getPointerTo());
+      s_2 =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
     }
 
       if(strcmp(id,"strcmp")==0)
-        return builder.CreateCall(strcmpGrace, std::vector<Value *> { s64_1, s64_2 });
+        return builder.CreateCall(strcmpGrace, std::vector<Value *> { s_1, s_2 });
       if(strcmp(id,"strcpy")==0){
-        builder.CreateCall(strcpyGrace, std::vector<Value *> { s64_1, s64_2 });
+        builder.CreateCall(strcpyGrace, std::vector<Value *> { s_1, s_2 });
         return nullptr;
       }
       if(strcmp(id,"strcat")==0){
-        builder.CreateCall(strcatGrace, std::vector<Value *> { s64_1, s64_2 });
+        builder.CreateCall(strcatGrace, std::vector<Value *> { s_1, s_2 });
         return nullptr;
       }
       
+    }
+
+    else{
+      std::vector<Value *> parameters = expr_list->compile_ExprList(false, id);
+      if(ReturnTypesOfFunc[id] != TYPE_nothing)
+        return builder.CreateCall(FuncPtr[id], parameters);
+      else{
+        builder.CreateCall(FuncPtr[id], parameters);
+        return nullptr;
+      }
     }
 
     return nullptr;
@@ -1259,6 +1303,7 @@ public:
       return const_list->getConstList();
     return {};
   }
+  
 private:
   Datatype type;
   ConstList *const_list;
@@ -1312,7 +1357,6 @@ public:
         for (char *c : id_list->getIdList()) {
           st.insertArray(c, t, v, line);
         }
-        
       }
     }
   }
@@ -1333,6 +1377,47 @@ public:
     }
     return s;
   }
+
+
+  virtual void findFparTypes(std::string funcName) override{
+    Datatype type = fpar_type->getType();
+    int IdListSize = id_list->getIdList().size();
+    for(int i = 0; i < IdListSize; i++){
+      if(type == TYPE_int&& !ref){
+        funcParamTypes[funcName].push_back(i32);
+        funcParamRefs[funcName].push_back(0);
+      }
+      else if(type == TYPE_int&& ref){
+        funcParamTypes[funcName].push_back(PointerType::get(i32, 0));
+        funcParamRefs[funcName].push_back(1);
+      }
+      else if(type == TYPE_char && !ref){
+        funcParamTypes[funcName].push_back(i8);
+        funcParamRefs[funcName].push_back(0);
+      }
+      else if(type == TYPE_char && ref){
+        funcParamTypes[funcName].push_back(PointerType::get(i8, 0));
+        funcParamRefs[funcName].push_back(1);
+      }
+    }
+  }
+
+  std::vector<std::vector<int>> getConstListFparDef() {
+    std::vector<std::vector<int>> v;
+    int IdListSize = id_list->getIdList().size();
+    for(int i = 0; i < IdListSize; i++){
+      v.push_back(fpar_type->getConstList());
+    }
+    return v;
+  }
+
+
+  std::vector<char *> getIdListFromFparDef(){
+    return id_list->getIdList();
+  }
+
+
+
 private:
   int line;
   IdList *id_list;
@@ -1368,6 +1453,33 @@ public:
     }
     return s;
   }
+
+
+  virtual void findFparTypes(std::string funcName) override{
+    for(Func *ldef_elem : fdef_list)
+      ldef_elem->findFparTypes(funcName);
+  }
+
+  std::vector<char *> getIdListFromFparDefList(){
+    std::vector<char *> v, temp;
+    for (FparDef *fdef: fdef_list){
+      temp = fdef->getIdListFromFparDef();
+      v.insert(v.end(), temp.begin(), temp.end());
+    }
+      
+    return v;
+  }
+  
+  std::vector<std::vector<int>> getConstListFparDefList(){
+    std::vector<std::vector<int>> v, temp;
+    for (FparDef *fdef: fdef_list){
+      temp = fdef->getConstListFparDef();
+      v.insert(v.end(), temp.begin(), temp.end());
+    }
+    return v;
+  }
+
+
 private:
   std::vector<FparDef *> fdef_list;
 };
@@ -1388,6 +1500,94 @@ public:
       st.insertFunction(id, rettype, fpar->getFunctionParameters(), line, false);
     }
   }
+
+  virtual Value *compile() override{
+    std::string nameOfFunc = id;
+
+    if(!firstFuncDefined){
+      if(strcmp(id, "main")==0){
+        nameOfFunc = "_main";
+      }
+      ReturnTypesOfFunc[id] = rettype;
+      FunctionType *funcType = FunctionType::get(Type::getVoidTy(TheContext), false);
+      FuncPtr[id] = Function::Create(funcType, Function::ExternalLinkage, nameOfFunc, TheModule.get());
+      firstFunc = FuncPtr[id];
+    }
+    
+    builder.SetInsertPoint(BasicBlock::Create(TheContext, "entry", FuncPtr[id]));
+
+    if(ReturnTypesOfFunc[id] == TYPE_int)
+    {
+      isCharVar["_returnValue"] = 0;
+      AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, "_returnValue");
+      NamedValues["_returnValue"] = Alloca;
+      NamedValuesTypes["_returnValue"] = i32;
+    } 
+
+    if(ReturnTypesOfFunc[id] == TYPE_char)
+    {
+      isCharVar["_returnValue"] = 1;
+      AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, "_returnValue");
+      NamedValues["_returnValue"] = Alloca;
+      NamedValuesTypes["_returnValue"] = i8;
+    } 
+
+    if(firstFuncDefined){
+      if(funcParamRefs.find(id)!= funcParamRefs.end()) {
+        std::vector<char *> fparamsVector = fpar->getIdListFromFparDefList();
+        std::vector<std::vector<int>> fparamsVectorDimensions = fpar->getConstListFparDefList();
+        int i =0;
+        for(char *c: fparamsVector) {
+
+          if(funcParamTypes[id][i] == i32){
+            isCharVar[c] = 0;
+            AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, c);
+            NamedValues[c] = Alloca;
+            NamedValuesTypes[c] = i32;
+            builder.CreateStore( &(*std::next(FuncPtr[id]->arg_begin(), i)), NamedValues[c]);
+          }
+          else if(funcParamTypes[id][i] == i8){
+            isCharVar[c] = 1;
+            AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, c);
+            NamedValues[c] = Alloca;
+            NamedValuesTypes[c] = i8;
+            builder.CreateStore( &(*std::next(FuncPtr[id]->arg_begin(), i)), NamedValues[c]);
+          }
+          else if(funcParamTypes[id][i] == PointerType::get(i32, 0)){
+            isCharVar[c] = 0;
+            NamedValues[c] = std::next(FuncPtr[id]->arg_begin(), i);
+            NamedValuesTypes[c] = i32;
+            ArrDimensions[c] = fparamsVectorDimensions[i];
+            
+          }
+          else if(funcParamTypes[id][i] == PointerType::get(i8, 0)){
+            isCharVar[c] = 1;
+            NamedValues[c] = std::next(FuncPtr[id]->arg_begin(), i);
+            NamedValuesTypes[c] = i8;
+            ArrDimensions[c] = fparamsVectorDimensions[i];
+          }
+
+          i++;
+        }
+
+      }
+    }     
+    firstFuncDefined = true;
+    return nullptr;
+  }
+
+  virtual void findFparTypes(std::string funcName) override{
+    fpar->findFparTypes(funcName);
+  }
+
+  Datatype getDataype(){
+    return rettype;
+  }
+
+  std::string getFuncName(){
+    return id;
+  }
+
 private:
   char *id;
   FparDefList *fpar;
@@ -1414,9 +1614,38 @@ public:
     for(Func *ldef_elem : ldef_list) ldef_elem->sem();
   }
 
-  virtual Value *compile() override {
-    for(Func *ldef_elem : ldef_list) ldef_elem->compile();
-    return nullptr;
+  std::vector<Func *> compile_LocalDef(){
+    std::vector<Func *> functions;
+    for(Func *ldef_elem : ldef_list){
+      if(ldef_elem->getTypeOfFunc() == "VarDef")
+        ldef_elem->compile();
+     else if(ldef_elem->getTypeOfFunc() == "FuncDef")
+      {
+        std::string id = ldef_elem->getFuncName();
+        std::string nameOfFunc = id;
+        
+        
+        //FIND PARAMS 
+        ldef_elem->findFparTypes(id);
+
+        //DEFINE FUNCTION
+        if(id == "main"){
+          nameOfFunc = "_main";
+        }
+        ReturnTypesOfFunc[id] = ldef_elem->getDataype();
+        FunctionType *funcType;
+        if(ReturnTypesOfFunc[id] == TYPE_int) 
+          funcType = FunctionType::get(Type::getInt32Ty(TheContext), funcParamTypes[id], false);
+        else if(ReturnTypesOfFunc[id] == TYPE_char) 
+          funcType = FunctionType::get(Type::getInt8Ty(TheContext), funcParamTypes[id], false);
+        else
+          funcType = FunctionType::get(Type::getVoidTy(TheContext), funcParamTypes[id], false);
+        FuncPtr[id] = Function::Create(funcType, Function::ExternalLinkage, nameOfFunc, TheModule.get());
+        functions.push_back(ldef_elem);
+      }
+    }
+ 
+    return functions;
   }
 
 private:
@@ -1440,10 +1669,44 @@ public:
   }
 
   virtual Value *compile() override{
-    local->compile();
+    head->compile();
+    std::vector<Func *> nestedFunctions = local->compile_LocalDef();
     block->compile();
+
+    BasicBlock *ReturnBlock = BasicBlock::Create(TheContext, "return", FuncPtr[head->getFuncName()]);
+    builder.CreateBr(ReturnBlock);
+    builder.SetInsertPoint(ReturnBlock);
+    if(head->getDataype() == TYPE_nothing)
+      builder.CreateRetVoid();
+    if(head->getDataype() == TYPE_int)
+      builder.CreateRet(builder.CreateLoad(NamedValuesTypes["_returnValue"], NamedValues["_returnValue"], "_returnValue"));
+    if(head->getDataype() == TYPE_char)
+      builder.CreateRet(builder.CreateLoad(NamedValuesTypes["_returnValue"], NamedValues["_returnValue"], "_returnValue"));
+
+    TheFPM->run(*FuncPtr[head->getFuncName()]);
+    
+    for(Func *function : nestedFunctions)
+      function->compile();
     return nullptr;
   }
+  
+  virtual void findFparTypes(std::string funcName) override{
+    head->findFparTypes(funcName);
+  }
+
+  virtual std::string getTypeOfFunc() override{
+    return "FuncDef";
+  }
+
+  virtual Datatype getDataype() override{
+    return head->getDataype();
+
+  }
+
+  virtual std::string getFuncName() override{
+    return head->getFuncName();
+  }
+
 private:
   Header *head;
   LocalDefList *local;
@@ -1494,11 +1757,13 @@ public:
           isCharVar[c] = 1;
           AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, c);
           NamedValues[c] = Alloca;
+          NamedValuesTypes[c] = i8;
         }
         else{
           isCharVar[c] = 0;
           AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, c);
           NamedValues[c] = Alloca;
+          NamedValuesTypes[c] = i32;
         }
       }
     }
@@ -1510,14 +1775,15 @@ public:
           std::vector<int> sizes = type->getConstList();
 
           // Calculate the total size of the N-dimensional array
-          Value *totalSize = ConstantInt::get(Type::getInt8Ty(TheContext),  type->getConstList()[0]);
+          Value *totalSize = ConstantInt::get(Type::getInt32Ty(TheContext),  type->getConstList()[0]);
           for (int i = 1; i < dimensions; ++i) {
-              totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt8Ty(TheContext), sizes[i]));
+              totalSize = builder.CreateMul(totalSize, ConstantInt::get(Type::getInt32Ty(TheContext), sizes[i]));
           }
 
           // Allocate memory for the N-dimensional array
           AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt8Ty(TheContext), totalSize, c);
           NamedValues[c] = arrayPtr;
+          NamedValuesTypes[c] = i8;
           ArrDimensions[c] = sizes;
         }
         else{
@@ -1534,12 +1800,17 @@ public:
           // Allocate memory for the N-dimensional array
           AllocaInst *arrayPtr = builder.CreateAlloca(Type::getInt32Ty(TheContext), totalSize, c);
           NamedValues[c] = arrayPtr;
+          NamedValuesTypes[c] = i32;
           ArrDimensions[c] = sizes;
 
         }
       }
     }
     return nullptr;
+  }
+
+  virtual std::string getTypeOfFunc() override{
+    return "VarDef";
   }
 
 private:

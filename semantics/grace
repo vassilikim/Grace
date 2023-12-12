@@ -10,6 +10,19 @@ NC='\033[0m' # No Color
 
 set -e
 
+# Check the number of arguments
+if [ "$#" -ne 1 ] && [ "$#" -ne 2 ]; then
+    echo "Usage: $0 file.grc [-O] | $0 -f [-O] | $0 -i [-O]"
+    exit 1
+fi
+
+# Check if the second argument is "-O"
+if [ "$#" -ne 1 ] && [ "$2" != "-O" ]; then
+    echo "Usage: $0 file.grc [-O] | $0 -f [-O] | $0 -i [-O]"
+    exit 1
+fi
+
+
 make
 
 echo -e "${CYAN}"
@@ -23,16 +36,64 @@ echo "  \\\$\$\$\$\$\$  |\$\$ |     \\$\$\$\$\$\$\$ |\\\$\$\$\$\$\$\$\\ \\\$\$\$
 echo "   \______/ \__|      \_______| \_______| \_______|"
 echo -e "${NC}"
 
-./graceCompiler <$1
-llc temp.ll
+start_time=$(date +%s.%N)
+
+if [ "$1" = "-i" ] || [ "$1" = "-f" ]; then
+    ./graceCompiler $2 
+else 
+    ./graceCompiler $2 <$1  
+fi
+
+
+if [ "$1" = "-i" ]; then
+echo ""
+echo "IR:" 
+echo "*************************************************"
+    cat temp.imm
+echo "*************************************************"
+    exit 0
+fi
+
+llc temp.imm -o temp.asm
+
+if [ "$1" = "-f" ]; then
+echo ""
+echo "Assemble:" 
+echo "*************************************************"
+    cat temp.asm
+echo "*************************************************"
+    exit 0
+fi
+
+
+###################################################################
+###################### REMOVE WHEN FINISH #########################
+###################################################################
 echo -e "- ${YELLOW}Assemble Generation${NC}: ${GREEN}PASSED${NC}"
-clang -no-pie temp.s lib.a
+clang -no-pie temp.asm lib.a 
 echo -e "- ${YELLOW}Output Executable${NC}: ${GREEN}PASSED${NC}"
 echo -e "- Compilation completed ${GREEN}SUCCESSFULLY${NC}."
+end_time=$(date +%s.%N)
+time_diff=$(echo "($end_time - $start_time) * 1000" | bc)
+formatted_time=$(printf "%.2f" $time_diff)
+echo "Compilation Time: $formatted_time ms"
 
 echo ""
 echo "Program Execution:" 
-echo "*************************************************" 
+echo "*************************************************"
+start_time=$(date +%s.%N)
 ./a.out
-echo "*************************************************" 
-echo "" 
+end_time=$(date +%s.%N)
+echo "*************************************************"
+time_diff=$(echo "($end_time - $start_time) * 1000" | bc)
+formatted_time=$(printf "%.2f" $time_diff)
+echo "Elapsed Time: $formatted_time ms"
+
+
+###################################################################
+###################### KEEP WHEN FINISH #########################
+###################################################################
+#filename=$1
+#cp temp.imm "${filename%.*}.imm"
+#cp temp.asm "${filename%.*}.asm"
+exit 0
