@@ -850,6 +850,8 @@ public:
           expr->sem();
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() > 0) {
           showSemanticError(30, line, func->getParameterNames()[i]);
+        } else if (dimensions[i].size() > 0) {
+          showSemanticError(28, line, expr->getName());
         } else {
           expr->sem();
         }
