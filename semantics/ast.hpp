@@ -851,7 +851,7 @@ public:
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() > 0) {
           showSemanticError(30, line, func->getParameterNames()[i]);
         } else if (dimensions[i].size() > 0) {
-          showSemanticError(30, line, expr->getName());
+          showSemanticError(30, line, func->getParameterNames()[i]);
         } else {
           expr->sem();
         }
