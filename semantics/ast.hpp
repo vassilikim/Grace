@@ -830,6 +830,11 @@ public:
       // var is an array, does not get array call
       } else if (expr->getTypeOfExpr() != "Array" && exprDimensions.size() > 0) {
         if (dimensions[i].size() == exprDimensions.size()) {
+          for (long unsigned int j = 0; j < dimensions[i].size(); j++) {
+            if (dimensions[i][j] != 0 && dimensions[i][j] != exprDimensions[j]) {
+              showSemanticError(30, line, func->getParameterNames()[i]);
+            }
+          }
           expr->sem();
         } else {
           showSemanticError(30, line, func->getParameterNames()[i]);
@@ -840,6 +845,11 @@ public:
           showSemanticError(30, line, func->getParameterNames()[i]);
         } else if (dimensions[i].size() < exprDimensions.size()) {
           expr->semArrayCall(exprDimensions.size() - dimensions[i].size());
+          for (long unsigned int j = 0; j < dimensions[i].size(); j++) {
+            if (dimensions[i][j] != 0 && dimensions[i][j] != exprDimensions[j + exprDimensions.size() - dimensions[i].size()]) {
+              showSemanticError(30, line, func->getParameterNames()[i]);
+            }
+          }
           expr->sem();
         }
       // var is not an array, does not get array call
@@ -847,6 +857,9 @@ public:
         if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 0) {
           showSemanticError(31, line, func->getParameterNames()[i]);
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 1) {
+          if (dimensions[i][0] != 0 && dimensions[i][0] != static_cast<int>(strlen(expr->getName()))) {
+            showSemanticError(32, line, expr->getName());
+          }
           expr->sem();
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() > 0) {
           showSemanticError(30, line, func->getParameterNames()[i]);
