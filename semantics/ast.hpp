@@ -857,7 +857,8 @@ public:
         if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 0) {
           showSemanticError(31, line, func->getParameterNames()[i]);
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 1) {
-          if (dimensions[i][0] != 0 && dimensions[i][0] != static_cast<int>(strlen(expr->getName()))) {
+          String *string = dynamic_cast<String *>(expr);
+          if (dimensions[i][0] != 0 && dimensions[i][0] != static_cast<int>(strlen(string->getString()))) {
             showSemanticError(32, line, expr->getName());
           }
           expr->sem();
