@@ -151,6 +151,17 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
   exit(1);
 }
 
+static void showSemanticWarning(int errorCode, int line, char* op) {
+  printf("\033[1;31mwarning:\n\t\033[0m");
+  if (errorCode == 1) {
+    printf("Index of array call \'");
+    printf("\033[1;35m%s\033[0m", op);
+    printf("\' out of bounds.");
+  } 
+  printf(" -- line: ");
+  printf("\033[1;36m%d\n\033[0m", line);
+}
+
 
 class SymbolEntry {
 public:
