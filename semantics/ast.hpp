@@ -880,7 +880,7 @@ public:
           showSemanticError(31, line, func->getParameterNames()[i]);
         } else if (expr->getTypeOfExpr() == "String" && dimensions[i].size() == 1) {
           String *string = dynamic_cast<String *>(expr);
-          if (dimensions[i][0] != 0 && dimensions[i][0] != static_cast<int>(strlen(string->getString()))) {
+          if (dimensions[i][0] != 0 && dimensions[i][0] < (static_cast<int>(strlen(string->getString()))+1)) {
             showSemanticError(32, line, expr->getName());
           }
           expr->sem();
