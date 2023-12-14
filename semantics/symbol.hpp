@@ -141,8 +141,22 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " cannot be assigned a string value.";
   } else if (errorCode == 32) {
+    char* newOp = new char;
+    int i=-1, j=-1;
+    do{
+        i++;
+        j++;
+        if(op[i] == '\n') {newOp[j] = '\\'; j++; newOp[j]='n';}
+        else if(op[i] == '\t') {newOp[j] = '\\'; j++; newOp[j]='t';}
+        else if(op[i] == '\r') {newOp[j] = '\\'; j++; newOp[j]='r';}
+        else if(op[i] == '\\') {newOp[j] = '\\'; j++; newOp[j]='\\';}
+        else if(op[i] == '\'') {newOp[j] = '\\'; j++; newOp[j]='\'';}
+        else if(op[i] == '\"') {newOp[j] = '\\'; j++; newOp[j]='\"';}
+        else newOp[j] = op[i];
+
+    }while(op[i]!='\0');
     std::cerr << "String " ;
-    printf("\033[1;35m%s\033[0m", op);
+    printf("\033[1;35m%s\033[0m", newOp);
     std::cerr << " does not match the size of the function parameter.";
   } else if (errorCode == 33) {
     std::cerr << "Array " ;
