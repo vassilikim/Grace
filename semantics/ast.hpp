@@ -1424,6 +1424,11 @@ public:
     if (id_list != nullptr && fpar_type != nullptr) {
       Datatype t = fpar_type->getType();
       std::vector<int> v = fpar_type->getConstList();
+      for (int i : v) {
+          if (i == -1) {
+            showSemanticError(33, line, id_list->getIdList()[0]);
+          }
+      }
       if (v.size() == 0) {
         for (char *c : id_list->getIdList()) {
           st.insertVar(c, t, line);
@@ -1814,6 +1819,11 @@ public:
   virtual void sem() override {
     Datatype t = type->getTypeBts();
     std::vector<int> v = type->getConstList();
+    for (int i : v) {
+        if (i == -1) {
+          showSemanticError(33, line, id_list->getIdList()[0]);
+        }
+    }
     if (v.size() == 0) {
       for (char *c : id_list->getIdList()) {
       st.insertVar(c, t, line);

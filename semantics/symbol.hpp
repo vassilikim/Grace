@@ -144,6 +144,10 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "String " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " does not match the size of the function parameter.";
+  } else if (errorCode == 33) {
+    std::cerr << "Array " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot have a dimension with size 0.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);

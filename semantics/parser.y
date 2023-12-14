@@ -100,7 +100,7 @@ program:
                                             printf("- \033[1;35mAST\033[0m:\n");
                                             std::cout << "=================================================" << std::endl; 
                                             std::cout << "Remove the comment in the parser.y line 103 to display it." << std::endl; 
-                                            //std::cout << *$1 << std::endl; 
+                                            std::cout << *$1 << std::endl; 
                                             std::cout << "=================================================" << std::endl; 
                                             printf("- \033[1;33mParsing\033[0m: \033[1;32mPASSED\n\033[0m");
                                             parsingTree->sem();
@@ -149,7 +149,7 @@ type:
 
 int-const_list: 
     /*nothing*/                         { $$ = new ConstList(); }   
-|   int-const_list '[' T_const ']'      { $1->append($3); $$ = $1; }
+|   int-const_list '[' T_const ']'      { if ($3 == 0) {$1->append(-1);} else {$1->append($3);}; $$ = $1; }
 ;
 
 ret-type: 
@@ -160,7 +160,7 @@ ret-type:
 fpar-type: 
     data-type                                   { $$ = new FparType($1); }
 |   data-type '[' ']' int-const_list            { $4->putinfront(0); $$ = new FparType($1, $4); }
-|   data-type '[' T_const ']' int-const_list    { $5->putinfront($3); $$ = new FparType($1, $5); }
+|   data-type '[' T_const ']' int-const_list    { if ($3 == 0) {$5->putinfront(-1);} else {$5->putinfront($3);}; $$ = new FparType($1, $5); }
 ;
 
 local-def: 
