@@ -848,7 +848,7 @@ public:
       } else if (expr->getTypeOfExpr() != "Array" && exprDimensions.size() > 0) {
         if (dimensions[i].size() == exprDimensions.size()) {
           for (long unsigned int j = 0; j < dimensions[i].size(); j++) {
-            if (dimensions[i][j] != 0 && dimensions[i][j] != exprDimensions[j]) {
+            if (dimensions[i][j] != 0 && exprDimensions[j] != 0 && dimensions[i][j] != exprDimensions[j]) {
               showSemanticError(30, line, func->getParameterNames()[i]);
             }
           }
@@ -868,7 +868,7 @@ public:
 
           expr->semArrayCall(newDimensions);
           for (long unsigned int j = 0; j < dimensions[i].size(); j++) {
-            if (dimensions[i][j] != 0 && dimensions[i][j] != exprDimensions[j + exprDimensions.size() - dimensions[i].size()]) {
+            if (dimensions[i][j] != 0 && exprDimensions[j + exprDimensions.size() - dimensions[i].size()] != 0 && dimensions[i][j] != exprDimensions[j + exprDimensions.size() - dimensions[i].size()]) {
               showSemanticError(30, line, func->getParameterNames()[i]);
             }
           }
