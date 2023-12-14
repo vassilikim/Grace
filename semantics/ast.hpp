@@ -499,7 +499,7 @@ public:
     dimensions.pop_back();
 
     if (expr->getTypeOfExpr() == "Const") {
-      if (dynamic_cast<Const *>(expr)->getConst() >= current) {
+      if (current != 0 && dynamic_cast<Const *>(expr)->getConst() >= current) {
         showSemanticWarning(1, line, lvalue->getName());
       }
     }
