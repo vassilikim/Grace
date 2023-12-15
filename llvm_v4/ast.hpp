@@ -369,21 +369,9 @@ private:
 
 class String: public Expr {
 public:
-  String(char *s): str(s) {}
-  ~String() { delete str; }
-  virtual void printOn(std::ostream &out) const override {
-    out << "String(" << str << ")";
-  }
-  virtual void sem() override {
-    type = TYPE_char;
-  }
-  virtual char *getName() override {
-    return str;
-  }
-
-  char *getString(){
+  String(char *s): str(s) {
     int i=1, j=0;
-    char* new_str = str;
+    new_str = str;
     do{
       if(str[i]=='\"' && str[i-1]!='\\'){new_str[j] = '\0'; break;}
       if(str[i]!='\\') new_str[j] = str[i];
@@ -409,6 +397,19 @@ public:
       i++;
       j++;
     }while(str[i]!='\0');
+  }
+  ~String() { delete str; }
+  virtual void printOn(std::ostream &out) const override {
+    out << "String(" << str << ")";
+  }
+  virtual void sem() override {
+    type = TYPE_char;
+  }
+  virtual char *getName() override {
+    return str;
+  }
+
+  char *getString(){
     return new_str;
   }
 
@@ -421,12 +422,38 @@ public:
   }
 
 private:
-    char *str;
+    char *str, *new_str;
 };
 
 class ConstChar: public Expr {
 public:
-  ConstChar(char *c): constchar(c) {}
+  ConstChar(char *c): constchar(c) {
+    // GIATI EKANES TO CONSTCHAR CHAR* ???????
+    int len;
+    for(int i=1;i<8;i++){
+      if(constchar[i]=='\''&& constchar[i+1]!='\'') //case of '\''
+      {
+        len = i+1;
+        break;
+      }
+    }
+    if(len == 3) {newConstchar = constchar[1]; return;}
+    if(len == 4){
+      if(constchar[2]=='n') {newConstchar = '\n'; return;}
+      if(constchar[2]=='t') {newConstchar = '\t'; return;}
+      if(constchar[2]=='r') {newConstchar = '\r'; return;}
+      if(constchar[2]=='0') {newConstchar = '\0'; return;}
+      if(constchar[2]=='\\') {newConstchar = '\\'; return;}
+      if(constchar[2]=='\'') {newConstchar = '\''; return;}
+      else {newConstchar = '\"'; return;}
+    }
+    int n1, n2;
+    if(constchar[3] >= '0' && constchar[3] <= '9') n1 = constchar[3] -'0';
+    else n1 = constchar[3] -'A' +10;
+    if(constchar[4] >= '0' && constchar[4] <= '9') n2 = constchar[4] -'0';
+    else n2 = int(constchar[4]) -'A' +10;
+    newConstchar =  char(n1* 16 + n2);
+  }
   virtual void printOn(std::ostream &out) const override {
     out << "ConstChar(" << constchar << ")";
   }
@@ -437,32 +464,8 @@ public:
     return constchar;
   }
 
-  // GIATI EKANES TO CONSTCHAR CHAR* ???????
   char getChar(){
-    int len;
-    for(int i=1;i<8;i++){
-      if(constchar[i]=='\''&& constchar[i+1]!='\'') //case of '\''
-      {
-        len = i+1;
-        break;
-      }
-    }
-    if(len == 3) return constchar[1];
-    if(len == 4){
-      if(constchar[2]=='n') return '\n';
-      if(constchar[2]=='t') return '\t';
-      if(constchar[2]=='r') return '\r';
-      if(constchar[2]=='0') return '\0';
-      if(constchar[2]=='\\') return '\\';
-      if(constchar[2]=='\'') return '\'';
-      else return '\"';
-    }
-    int n1, n2;
-    if(constchar[3] >= '0' && constchar[3] <= '9') n1 = constchar[3] -'0';
-    else n1 = constchar[3] -'A' +10;
-    if(constchar[4] >= '0' && constchar[4] <= '9') n2 = constchar[4] -'0';
-    else n2 = int(constchar[4]) -'A' +10;
-    return char(n1* 16 + n2);
+    return newConstchar;
   }
 
   virtual Value *compile() override{
@@ -473,6 +476,7 @@ public:
 
 private:
   char *constchar;
+  char newConstchar;
 };
 
 class ArrayCall: public Expr {
