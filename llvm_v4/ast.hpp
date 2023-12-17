@@ -838,6 +838,7 @@ public:
   virtual void exprListSem(SymbolEntry* func, int l, char* f) {
     std::vector<Datatype> datatypes = func->getParameterDatatypes();
     std::vector<std::vector<int>> dimensions = func->getParameterDimensions();
+    std::vector<bool> refs = func->getParameterRefs();
     if (expr_list.size() != datatypes.size()) {
       showSemanticError(14, l, f);
     }
@@ -892,6 +893,8 @@ public:
           showSemanticError(30, line, func->getParameterNames()[i]);
         } else if (dimensions[i].size() > 0) {
           showSemanticError(30, line, func->getParameterNames()[i]);
+        } else if (refs[i] == true && expr->getTypeOfExpr() != "Id" && expr->getTypeOfExpr() != "String") {
+          showSemanticError(34, line, func->getParameterNames()[i]);
         } else {
           expr->sem();
         }

@@ -162,6 +162,10 @@ static void showSemanticError(int errorCode, int line, char* op, Datatype expect
     std::cerr << "Array " ;
     printf("\033[1;35m%s\033[0m", op);
     std::cerr << " cannot have a dimension with size 0.";
+  } else if (errorCode == 34) {
+    std::cerr << "Reference parameter " ;
+    printf("\033[1;35m%s\033[0m", op);
+    std::cerr << " cannot be a constant.";
   }
   printf(" -- line: ");
   printf("\033[1;36m%d\n\033[0m", line);

@@ -100,7 +100,7 @@ program:
                                             printf("- \033[1;35mAST\033[0m:\n");
                                             std::cout << "=================================================" << std::endl; 
                                             std::cout << "Remove the comment in the parser.y line 103 to display it." << std::endl; 
-                                            std::cout << *$1 << std::endl; 
+                                            //std::cout << *$1 << std::endl; 
                                             std::cout << "=================================================" << std::endl; 
                                             printf("- \033[1;33mParsing\033[0m: \033[1;32mPASSED\n\033[0m");
                                             parsingTree->sem();
