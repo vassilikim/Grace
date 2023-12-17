@@ -18,4 +18,17 @@
 /interpreter/grace
 /interpreter/testing.sh
 
+/llvm_v4/lexer.cpp
+/llvm_v4/lexer.o
+/llvm_v4/parser.cpp
+/llvm_v4/parser.hpp
+/llvm_v4/parser.o
+/llvm_v4/parser.output
+/llvm_v4/graceCompiler
+/llvm_v4/a.out
+/llvm_v4/lib.a
+/llvm_v4/lib.o
+/llvm_v4/temp.asm
+/llvm_v4/temp.imm
+
 /.vscode
