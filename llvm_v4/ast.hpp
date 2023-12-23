@@ -44,6 +44,7 @@ static std::map<std::string, Function*> FuncPtr;
 static std::map<std::string, std::vector<Type *>>  funcParamTypes;
 static std::map<std::string, std::vector<int>>  funcParamRefs;
 static std::map<std::string, Datatype> ReturnTypesOfFunc;
+static BasicBlock *ReturnBlockofCurrentFunc;
 
 static IRBuilder<> builder(TheContext);
 static Function* mainFunc;
@@ -163,7 +164,11 @@ public:
     builder.CreateCall(firstFunc);
     Value *returnValue = ConstantInt::get(Type::getInt32Ty(TheContext), 0);
     builder.CreateRet(returnValue);
-
+    // Verify the module before generating code
+    if (llvm::verifyModule(*TheModule, &llvm::errs())) {
+        llvm::errs() << "Error: Invalid LLVM IR\n";
+        // Handle the error, e.g., exit the program or take corrective action
+    } 
     printf("- \033[1;33mIR Generation\033[0m: \033[1;32mPASSED\033[0m\n");
 
     // Open the file for writing
@@ -1013,10 +1018,11 @@ public:
     st.setCurrentScopeReturned();
   }
   virtual Value *compile() override {
+    Function *TheFunction = builder.GetInsertBlock()->getParent();
     if(expr != nullptr)
       builder.CreateStore(expr->compile(), NamedValues["_returnValue"]);
-    builder.CreateBr(BasicBlock::Create(TheContext, "return"));
-
+    builder.CreateBr(ReturnBlockofCurrentFunc);
+    builder.SetInsertPoint(BasicBlock::Create(TheContext, "continue", TheFunction));
     return nullptr;
   }
 
@@ -1758,11 +1764,12 @@ public:
   virtual Value *compile() override{
     head->compile();
     std::vector<Func *> nestedFunctions = local->compile_LocalDef();
+    ReturnBlockofCurrentFunc = BasicBlock::Create(TheContext, "return", FuncPtr[head->getFuncName()]);
+    
     block->compile();
-
-    BasicBlock *ReturnBlock = BasicBlock::Create(TheContext, "return", FuncPtr[head->getFuncName()]);
-    builder.CreateBr(ReturnBlock);
-    builder.SetInsertPoint(ReturnBlock);
+    
+    builder.CreateBr(ReturnBlockofCurrentFunc);
+    builder.SetInsertPoint(ReturnBlockofCurrentFunc);
     if(head->getDataype() == TYPE_nothing)
       builder.CreateRetVoid();
     if(head->getDataype() == TYPE_int)
