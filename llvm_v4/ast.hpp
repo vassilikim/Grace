@@ -126,7 +126,7 @@ public:
     readChar = Function::Create(readChar_type, Function::ExternalLinkage, "readChar", TheModule.get());
 
     // declare void @readString()
-    FunctionType *readString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> { PointerType::get(i8, 0) }, false);
+    FunctionType *readString_type = FunctionType::get(Type::getVoidTy(TheContext),  std::vector<Type *> {i32, PointerType::get(i8, 0)}, false);
     readString = Function::Create(readString_type, Function::ExternalLinkage, "readString", TheModule.get());
 
     // declare void @ascii()
@@ -1266,17 +1266,19 @@ public:
       return builder.CreateCall(readChar);
     }
     else if(strcmp(id,"readString")==0){
-      if(((expr_list->getExprList())[0])->getTypeOfExpr() == "Id"){
-        char* id = (expr_list->getExprList())[0]->getName();
+      if(((expr_list->getExprList())[1])->getTypeOfExpr() == "Id"){
+        Value *n = ((expr_list->getExprList())[0])->compile();
+        char* id = (expr_list->getExprList())[1]->getName();
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
-        builder.CreateCall(readString, std::vector<Value *> { s });
+        builder.CreateCall(readString, std::vector<Value *> { n, s });
         return nullptr;
       }
       else{
-        char* id = (expr_list->getExprList())[0]->getName();
-        Value *offset = ((expr_list->getExprList())[0])->getOffset(id, ArrDimensions[id].size()-1);
+        Value *n = ((expr_list->getExprList())[0])->compile();
+        char* id = (expr_list->getExprList())[1]->getName();
+        Value *offset = ((expr_list->getExprList())[1])->getOffset(id, ArrDimensions[id].size()-1);
         Value *s =  builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[id],  {offset});
-        builder.CreateCall(readString, std::vector<Value *> { s });
+        builder.CreateCall(readString, std::vector<Value *> { n, s });
         return nullptr;
       }
     }
