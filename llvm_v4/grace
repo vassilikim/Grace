@@ -58,7 +58,7 @@ llc temp.imm -o temp.asm
 
 if [ "$1" = "-f" ]; then
 echo ""
-echo "Assemble:" 
+echo "Assembly:" 
 echo "*************************************************"
     cat temp.asm
 echo "*************************************************"
@@ -69,7 +69,7 @@ fi
 ###################################################################
 ###################### REMOVE WHEN FINISH #########################
 ###################################################################
-echo -e "- ${YELLOW}Assemble Generation${NC}: ${GREEN}PASSED${NC}"
+echo -e "- ${YELLOW}Assembly Generation${NC}: ${GREEN}PASSED${NC}"
 clang -no-pie temp.asm lib.a 
 echo -e "- ${YELLOW}Output Executable${NC}: ${GREEN}PASSED${NC}"
 echo -e "- Compilation completed ${GREEN}SUCCESSFULLY${NC}."
