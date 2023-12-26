@@ -45,7 +45,11 @@ extern void readString(int32_t n, int8_t *str) {
     int i = 0;
     while(i<n-1){
         c = getchar();
-        if(c == '\n') break;
+        if(c == '\n') 
+        {
+            if(i == 0 ) continue;
+            break;
+        }
         str[i] = c; 
         i=i+1;
     }
