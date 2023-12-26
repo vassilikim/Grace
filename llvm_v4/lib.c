@@ -40,10 +40,10 @@ extern int8_t readChar() {
     }
 }
 
-extern void readString(int8_t *str) {
+extern void readString(int32_t n, int8_t *str) {
     char c;
     int i = 0;
-    while(1){
+    while(i<n-1){
         c = getchar();
         if(c == '\n') break;
         str[i] = c; 
