@@ -46,12 +46,13 @@ static std::map<std::string, std::vector<int>>  funcParamRefs;
 static std::map<std::string, Datatype> ReturnTypesOfFunc;
 static BasicBlock *ReturnBlockofCurrentFunc;
 
-static std::string currentFunc = "";
+static std::string currentFunc = "_emptyStruct";
 static std::map<std::string, std::vector<Type *>> funcStructParam;
-static std::map<std::string, Value*> funcStruct;
+static  Value* funcStruct;
 static std::map<std::string, Type*> funcStructType;
 static std::map<std::string, std::string> parentFunc;
 static int structCounter;
+static Value* parentStruct; 
 
 static IRBuilder<> builder(TheContext);
 static Function* mainFunc;
@@ -170,8 +171,8 @@ public:
     mainFunc = Function::Create(funcType, Function::ExternalLinkage, "main", TheModule.get());
     BasicBlock *BB = BasicBlock::Create(TheContext, "entry", mainFunc);
     builder.SetInsertPoint(BB);
-    builder.CreateAlloca(funcStructType["_emptyStruct"]);
-    builder.CreateCall(firstFunc);
+    parentStruct = builder.CreateAlloca(funcStructType["_emptyStruct"]);
+    builder.CreateCall(firstFunc, parentStruct);
     Value *returnValue = ConstantInt::get(Type::getInt32Ty(TheContext), 0);
     builder.CreateRet(returnValue);
 
@@ -1363,6 +1364,48 @@ public:
 
     else{
       std::vector<Value *> parameters = expr_list->compile_ExprList(false, id);
+
+/**************************************************************************************************/
+/*************************NEVER CHANGE THIS AGAIN**************************************************/
+/**************************************************************************************************/
+/**************************************************************************************************/      
+      Value* PassingStruct = funcStruct;
+      int levelDropToParent;
+      std::string tmpFuncName;
+      //Find the ParentStruct
+      if(currentFunc!=parentFunc[id]){
+        PassingStruct = parentStruct;
+        if(currentFunc == id) 
+        {
+          PassingStruct = builder.CreateGEP(PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]), PassingStruct,  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
+          PassingStruct = builder.CreateLoad(PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]), PassingStruct );
+        }
+        else{
+          levelDropToParent = 1;
+          tmpFuncName = currentFunc;
+          while(parentFunc[tmpFuncName] != id){
+            levelDropToParent++;
+            tmpFuncName = parentFunc[tmpFuncName];
+          }
+
+          tmpFuncName = parentFunc[currentFunc];
+          while(levelDropToParent > 0){
+            PassingStruct = builder.CreateLoad(PointerType::getUnqual(funcStructType[tmpFuncName]), PassingStruct );
+            PassingStruct = builder.CreateStructGEP(funcStructType[tmpFuncName], PassingStruct, 0);
+            levelDropToParent--;
+            tmpFuncName = parentFunc[tmpFuncName];
+          }
+          PassingStruct = builder.CreateLoad(PointerType::getUnqual(funcStructType[tmpFuncName]), PassingStruct );
+        }
+      }
+
+      parameters.push_back(PassingStruct);
+
+/**************************************************************************************************/
+/**************************************************************************************************/
+/**************************************************************************************************/
+/**************************************************************************************************/
+
       if(ReturnTypesOfFunc[id] != TYPE_nothing)
         return builder.CreateCall(FuncPtr[id], parameters);
       else{
@@ -1637,7 +1680,7 @@ public:
     std::string nameOfFunc = id;
 
     if(!firstFuncDefined){
-      parentFunc[currentFunc] = "";
+      parentFunc[currentFunc] = "_emptyStruct";
       funcStructParam[currentFunc].insert(funcStructParam[currentFunc].begin(), PointerType::getUnqual(funcStructType["_emptyStruct"]));
 
 
@@ -1645,17 +1688,17 @@ public:
         nameOfFunc = "_main";
       }
       ReturnTypesOfFunc[id] = rettype;
-      FunctionType *funcType = FunctionType::get(Type::getVoidTy(TheContext), false);
+      FunctionType *funcType = FunctionType::get(Type::getVoidTy(TheContext), {PointerType::getUnqual(funcStructType["_emptyStruct"])}, false);
       FuncPtr[id] = Function::Create(funcType, Function::ExternalLinkage, nameOfFunc, TheModule.get());
       firstFunc = FuncPtr[id];
     }
     
     builder.SetInsertPoint(BasicBlock::Create(TheContext, "entry", FuncPtr[id]));
     
-    if(parentFunc[currentFunc] != "")
+    if(parentFunc[currentFunc] != "_emptyStruct")
       funcStructParam[currentFunc].insert(funcStructParam[currentFunc].begin(), PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]));
     funcStructType[currentFunc] = StructType::create(TheContext, funcStructParam[currentFunc], currentFunc+"_Struct");
-    funcStruct[currentFunc] = builder.CreateAlloca(funcStructType[currentFunc]);
+    funcStruct = builder.CreateAlloca(funcStructType[currentFunc]);
     structCounter = 0;
 
     if(ReturnTypesOfFunc[id] == TYPE_int)
@@ -1674,17 +1717,16 @@ public:
       NamedValuesTypes[currentFunc]["_returnValue"] = i8;
     } 
 
+    int i =0;
     if(firstFuncDefined){
-
       if(funcParamRefs.find(id)!= funcParamRefs.end()) {
         std::vector<char *> fparamsVector = fpar->getIdListFromFparDefList();
         std::vector<std::vector<int>> fparamsVectorDimensions = fpar->getConstListFparDefList();
-        int i =0;
         for(char *c: fparamsVector) {
 
           if(funcParamTypes[id][i] == i32){
             isCharVar[currentFunc][c] = 0;
-            Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+            Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
             //AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, c);
             NamedValues[currentFunc][c] = Alloca;
             NamedValuesTypes[currentFunc][c] = i32;
@@ -1692,7 +1734,7 @@ public:
           }
           else if(funcParamTypes[id][i] == i8){
             isCharVar[currentFunc][c] = 1;
-            Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+            Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
             //AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, c);
             NamedValues[currentFunc][c] = Alloca;
             NamedValuesTypes[currentFunc][c] = i8;
@@ -1700,7 +1742,7 @@ public:
           }
           else if(funcParamTypes[id][i] == PointerType::get(i32, 0)){
             isCharVar[currentFunc][c] = 0;
-            NamedValues[currentFunc][c] = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+            NamedValues[currentFunc][c] = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
             builder.CreateStore(std::next(FuncPtr[id]->arg_begin(), i), NamedValues[currentFunc][c]);
             NamedValues[currentFunc][c] = std::next(FuncPtr[id]->arg_begin(), i);
             NamedValuesTypes[currentFunc][c] = i32;
@@ -1709,7 +1751,7 @@ public:
           }
           else if(funcParamTypes[id][i] == PointerType::get(i8, 0)){
             isCharVar[currentFunc][c] = 1;
-            NamedValues[currentFunc][c] = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+            NamedValues[currentFunc][c] = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
             builder.CreateStore(std::next(FuncPtr[id]->arg_begin(), i), NamedValues[currentFunc][c]);
             NamedValues[currentFunc][c] = std::next(FuncPtr[id]->arg_begin(), i);
             NamedValuesTypes[currentFunc][c] = i8;
@@ -1720,7 +1762,13 @@ public:
         }
 
       }
-    }     
+    }
+    if(parentFunc[currentFunc] == "_emptyStruct")
+      parentStruct = builder.CreateAlloca(PointerType::getUnqual(funcStructType["_emptyStruct"]));
+    else
+      parentStruct = builder.CreateAlloca(PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]));
+    builder.CreateStore((std::next(FuncPtr[id]->arg_begin(), i)), parentStruct);
+
     firstFuncDefined = true;
     return nullptr;
   }
@@ -1797,7 +1845,7 @@ public:
         }
         ReturnTypesOfFunc[id] = ldef_elem->getDataype();
         FunctionType *funcType;
-        //funcParamTypes[id].push_back(tmpStruct);
+        funcParamTypes[id].push_back(PointerType::getUnqual(funcStructType[currentFunc]));
         if(ReturnTypesOfFunc[id] == TYPE_int) 
           funcType = FunctionType::get(Type::getInt32Ty(TheContext), funcParamTypes[id], false);
         else if(ReturnTypesOfFunc[id] == TYPE_char) 
@@ -1957,14 +2005,14 @@ public:
       for (char *c : id_list->getIdList()) {
         if(type->getTypeBts() == TYPE_char){
           isCharVar[currentFunc][c] = 1;
-          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
           //AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt8Ty(TheContext), nullptr, c);
           NamedValues[currentFunc][c] = Alloca;
           NamedValuesTypes[currentFunc][c] = i8;
         }
         else{
           isCharVar[currentFunc][c] = 0;
-          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
           //AllocaInst *Alloca  = builder.CreateAlloca(Type::getInt32Ty(TheContext), nullptr, c);
           NamedValues[currentFunc][c] = Alloca;
           NamedValuesTypes[currentFunc][c] = i32;
@@ -1990,7 +2038,7 @@ public:
           NamedValuesTypes[currentFunc][c] = i8;
           ArrDimensions[currentFunc][c] = sizes;
           //Save the array pointer in the struct
-          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
           Value *ptrOfArry = builder.CreateGEP(Type::getInt8Ty(TheContext), NamedValues[currentFunc][c],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
           builder.CreateStore(ptrOfArry, Alloca);
         }
@@ -2010,7 +2058,7 @@ public:
           NamedValues[currentFunc][c] = arrayPtr;
           NamedValuesTypes[currentFunc][c] = i32;
           ArrDimensions[currentFunc][c] = sizes;
-          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct[currentFunc], ++structCounter, c);
+          Value* Alloca = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, ++structCounter, c);
           Value *ptrOfArry = builder.CreateGEP(Type::getInt32Ty(TheContext), NamedValues[currentFunc][c],  {ConstantInt::get(Type::getInt32Ty(TheContext), 0)});
           builder.CreateStore(ptrOfArry, Alloca);
         }
