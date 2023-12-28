@@ -1731,9 +1731,54 @@ public:
       parentStruct = builder.CreateAlloca(PointerType::getUnqual(funcStructType["_emptyStruct"]));
     else
       parentStruct = builder.CreateAlloca(PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]));
+    parentStruct = builder.CreateStructGEP(funcStructType[currentFunc], funcStruct, 0, "parentFramePtr");
     builder.CreateStore((std::next(FuncPtr[id]->arg_begin(), lastParamIndex)), parentStruct);
 
     /*Seacrch All th Frames Above*/
+    std::string tmpCurrentFunc = currentFunc;
+    while(parentFunc[tmpCurrentFunc] != "_emptyStruct")
+    {
+      std::string varStr;
+      Value *PassingVar, *lastFrame;
+
+      if(tmpCurrentFunc == currentFunc)
+        lastFrame = parentStruct;
+      else
+      {
+        lastFrame = builder.CreateLoad(PointerType::getUnqual(funcStructType[tmpCurrentFunc]), lastFrame);
+        lastFrame = builder.CreateStructGEP(funcStructType[tmpCurrentFunc], lastFrame, 0);
+      }
+
+      for(i = 0; i<whenToStopLooking[tmpCurrentFunc][parentFunc[tmpCurrentFunc]];i++)
+      {
+        varStr = funcListOfVars[parentFunc[tmpCurrentFunc]][i];
+        if(NamedValues[currentFunc][varStr] == nullptr)
+        {
+          isCharVar[currentFunc][varStr] = isCharVar[parentFunc[tmpCurrentFunc]][varStr];
+
+          PassingVar = builder.CreateLoad(PointerType::getUnqual(funcStructType[parentFunc[tmpCurrentFunc]]), lastFrame );
+          PassingVar = builder.CreateStructGEP(funcStructType[parentFunc[tmpCurrentFunc]], PassingVar, (i+1), varStr);
+          if(!ArrDimensions[parentFunc[tmpCurrentFunc]][varStr].empty())
+          {
+            if(isCharVar[parentFunc[tmpCurrentFunc]][varStr] == 0)
+              PassingVar = builder.CreateLoad(PointerType::get(i32, 0), PassingVar, varStr);
+            if(isCharVar[parentFunc[tmpCurrentFunc]][varStr] == 1)
+              PassingVar = builder.CreateLoad(PointerType::get(i8, 0), PassingVar, varStr);
+          }
+          NamedValues[currentFunc][varStr] = PassingVar;
+          NamedValuesTypes[currentFunc][varStr] = NamedValuesTypes[parentFunc[tmpCurrentFunc]][varStr];
+          ArrDimensions[currentFunc][varStr] = ArrDimensions[parentFunc[tmpCurrentFunc]][varStr];
+        }
+      }
+
+
+      tmpCurrentFunc = parentFunc[tmpCurrentFunc];
+    }
+
+
+
+
+/*
     if(parentFunc[currentFunc] != "_emptyStruct"){
       std::string varStr;
       Value *PassingVar;
@@ -1759,7 +1804,7 @@ public:
         }
       }
     }
-
+*/
 
     i = 0;
     if(firstFuncDefined){
