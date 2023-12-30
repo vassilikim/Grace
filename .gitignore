@@ -31,4 +31,17 @@
 /llvm_v4/temp.asm
 /llvm_v4/temp.imm
 
+/Grace_demo/lexer.cpp
+/Grace_demo/lexer.o
+/Grace_demo/parser.cpp
+/Grace_demo/parser.hpp
+/Grace_demo/parser.o
+/Grace_demo/parser.output
+/Grace_demo/graceCompiler
+/Grace_demo/a.out
+/Grace_demo/lib.a
+/Grace_demo/lib.o
+/Grace_demo/temp.asm
+/Grace_demo/temp.imm
+
 /.vscode
