@@ -1376,7 +1376,11 @@ public:
       int levelDropToParent;
       std::string tmpFuncName;
       //Find the ParentStruct
-      if(currentFunc!=parentFunc[id]){
+      if(parentFunc[currentFunc] == parentFunc[id]){
+        PassingStruct = parentStruct;
+        PassingStruct = builder.CreateLoad(PointerType::getUnqual(funcStructType[parentFunc[currentFunc]]), PassingStruct );
+      }
+      else if(currentFunc!=parentFunc[id]){
         PassingStruct = parentStruct;
         if(currentFunc == id) 
         {
